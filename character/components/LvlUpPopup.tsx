@@ -10,6 +10,7 @@ import {
   effectiveStatLevel,
   computeEnlightenmentGold,
   levelupGoldForEXP,
+  expToNextLevel,
 } from '../../config/characterBalance.ts';
 
 // ── Color tokens ──────────────────────────────────────────────────────────────
@@ -62,20 +63,20 @@ const MAT_DEFS: Array<{ key: MatKey; color: string; expValue: number; label: str
 ];
 
 // ── EXP simulation ─────────────────────────────────────────────────────────────
+// Uses expToNextLevel(lv) at each step so each level has its own threshold.
 function simulateExp(
   charLevel: number,
   expCurrent: number,
-  expNextLevel: number,
   levelCap: number,
   totalExpGain: number,
 ): { simLv: number; simExp: number } {
   let lv  = charLevel;
   let exp = expCurrent + totalExpGain;
-  while (lv < levelCap && exp >= expNextLevel) {
-    exp -= expNextLevel;
+  while (lv < levelCap && exp >= expToNextLevel(lv)) {
+    exp -= expToNextLevel(lv);
     lv++;
   }
-  if (lv >= levelCap) exp = Math.min(exp, expNextLevel);
+  if (lv >= levelCap) exp = Math.min(exp, expToNextLevel(lv));
   return { simLv: lv, simExp: exp };
 }
 
@@ -86,7 +87,7 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
 }) => {
   const lvCap            = char.enlightenmentLevelCap;
   const isAtLevelCap     = char.charLevel >= lvCap;
-  const isEnlightenReady = isAtLevelCap && char.expCurrent >= char.expNextLevel;
+  const isEnlightenReady = isAtLevelCap && char.expCurrent >= expToNextLevel(char.charLevel);
 
   const tierColor   = TIER_COLOR[char.tier];
   const actionColor = isEnlightenReady ? ENLIGHTEN_COLOR : LVLUP_COLOR;
@@ -160,18 +161,21 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
                      + matQty.ExpSR * EXP_MATERIALS.ExpSR.expValue;
 
   const { simLv, simExp } = simulateExp(
-    char.charLevel, char.expCurrent, char.expNextLevel, lvCap, totalExpGain,
+    char.charLevel, char.expCurrent, lvCap, totalExpGain,
   );
   const previewLvDelta = simLv - char.charLevel;
-  const expIsFull      = simLv >= lvCap && simExp >= char.expNextLevel;
+  const expIsFull      = simLv >= lvCap && simExp >= expToNextLevel(simLv);
 
   // ── Auto-select: minimize wasted EXP ─────────────────────────────────────
   // Use floor for large stones so we never overshoot by a whole stone.
   // Only ceil at the N layer (last resort) — max waste is vN-1 = 199 EXP.
   // If small stones are exhausted, bump up the next tier by 1.
   const autoSelect = () => {
-    const expNeeded = (lvCap - char.charLevel) * char.expNextLevel
-                    + (char.expNextLevel - char.expCurrent);
+    // Sum EXP needed: remaining in current level + each subsequent level up to cap
+    let expNeeded = expToNextLevel(char.charLevel) - char.expCurrent;
+    for (let lv = char.charLevel + 1; lv < lvCap; lv++) {
+      expNeeded += expToNextLevel(lv);
+    }
     if (expNeeded <= 0) { setMatQty({ ExpN: 0, ExpR: 0, ExpSR: 0 }); return; }
 
     const vSR = EXP_MATERIALS.ExpSR.expValue;
@@ -214,10 +218,10 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
   };
 
   // ── Bar percentages ───────────────────────────────────────────────────────
-  const lvlPct     = char.expNextLevel > 0
-    ? Math.min((char.expCurrent / char.expNextLevel) * 100, 100) : 100;
-  const previewPct = char.expNextLevel > 0
-    ? Math.min((simExp / char.expNextLevel) * 100, 100) : 100;
+  const curThreshold  = expToNextLevel(char.charLevel);
+  const simThreshold  = expToNextLevel(simLv);
+  const lvlPct     = Math.min((char.expCurrent / curThreshold) * 100, 100);
+  const previewPct = Math.min((simExp / simThreshold) * 100, 100);
 
   // ── Display level & delta ─────────────────────────────────────────────────
   const hasMatPreview = totalExpGain > 0;
@@ -226,8 +230,8 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   // Stat gain fires when EXP bar fills — so effective level = charLevel+1 when exp is full.
-  const effLvBefore = effectiveStatLevel(char.charLevel, char.expCurrent, char.expNextLevel);
-  const effLvAfter  = effectiveStatLevel(simLv, simExp, char.expNextLevel);
+  const effLvBefore = effectiveStatLevel(char.charLevel, char.expCurrent, curThreshold);
+  const effLvAfter  = effectiveStatLevel(simLv, simExp, simThreshold);
   const statsBefore = computeCharStats(char.tier, effLvBefore);
   const statsAfter  = computeCharStats(char.tier, hasMatPreview ? effLvAfter : effLvBefore);
   const enCost      = isAtLevelCap ? ENLIGHTENMENT_COSTS[char.enlightenment + 1] : null;
@@ -336,7 +340,7 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#64748b' }}>
               <span>EXP {(hasMatPreview ? simExp : char.expCurrent).toLocaleString()}</span>
-              <span>{char.expNextLevel.toLocaleString()}</span>
+              <span>{(hasMatPreview ? simThreshold : curThreshold).toLocaleString()}</span>
             </div>
           </div>
 
@@ -355,25 +359,27 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
                     <span style={{ color, fontSize: 20, flexShrink: 0 }}>{icon}</span>
                     <span style={{ fontSize: 15, color: '#c8d8ec', fontWeight: 700, width: 34, flexShrink: 0 }}>{label}</span>
                     {showDelta ? (
-                      <>
+                      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
                         {/* before — fixed-width column, right-aligned */}
                         <span style={{
                           fontSize: 15, color: '#64748b',
-                          minWidth: 44, textAlign: 'right', flexShrink: 0,
+                          minWidth: 52, textAlign: 'right', flexShrink: 0,
                         }}>
                           {before.toLocaleString()}
                         </span>
                         <span style={{ fontSize: 11, color: '#334155', flexShrink: 0 }}>→</span>
-                        <span style={{ fontSize: 15, fontWeight: 800, color, flexShrink: 0 }}>
+                        {/* after — fixed-width column, right-aligned */}
+                        <span style={{
+                          fontSize: 15, fontWeight: 800, color,
+                          minWidth: 52, textAlign: 'right', flexShrink: 0,
+                        }}>
                           {after.toLocaleString()}
                         </span>
-                        <span style={{
-                          fontSize: 15, color: '#f59e0b',
-                          minWidth: 38, textAlign: 'right', marginLeft: 'auto', flexShrink: 0,
-                        }}>
+                        {/* delta — immediately after after */}
+                        <span style={{ fontSize: 14, color: '#f59e0b', flexShrink: 0 }}>
                           +{delta.toLocaleString()}
                         </span>
-                      </>
+                      </div>
                     ) : (
                       <span style={{ fontSize: 17, fontWeight: 800, color, marginLeft: 'auto' }}>
                         {before.toLocaleString()}
@@ -476,7 +482,7 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
                       >
                         {/* Placeholder icon */}
                         <span style={{
-                          fontSize: 60,
+                          fontSize: 48,
                           color,
                           opacity: isSel ? 1 : 0.7,
                           filter: `drop-shadow(0 0 6px ${color}66)`,
@@ -490,7 +496,7 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
                         <span style={{
                           position: 'absolute', bottom: 4,
                           left: 0, right: 0, textAlign: 'center',
-                          fontSize: 20, color: '#64748b', fontWeight: 700,
+                          fontSize: 14, color: '#64748b', fontWeight: 700,
                           lineHeight: 1,
                         }}>
                           {owned}
@@ -500,7 +506,7 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
                         {qty > 0 && (
                           <span style={{
                             position: 'absolute', top: 4, right: 5,
-                            fontSize: 20, fontWeight: 800,
+                            fontSize: 14, fontWeight: 800,
                             color: '#0a0f1e',
                             background: color,
                             borderRadius: 5, padding: '1px 5px',
@@ -606,34 +612,40 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
               minWidth: 0,
             }}>
               <span style={{ fontSize: 16, flexShrink: 0 }}>🪙</span>
-              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                <span style={{
-                  fontSize: 14, fontWeight: 800,
-                  color: goldCost === 0 ? '#475569' : goldShort ? '#f87171' : '#fbbf24',
-                  lineHeight: 1.2,
-                  whiteSpace: 'nowrap',
-                }}>
-                  {goldCost.toLocaleString()}
-                </span>
-                <span style={{ fontSize: 10, color: '#475569', lineHeight: 1 }}>Gold</span>
-              </div>
+              <span style={{
+                fontSize: 14, fontWeight: 800,
+                color: goldCost === 0 ? '#475569' : goldShort ? '#f87171' : '#fbbf24',
+                whiteSpace: 'nowrap',
+              }}>
+                {goldCost.toLocaleString()}
+              </span>
             </div>
 
             {/* Confirm button — half width, right side */}
-            <button
-              onClick={onClose}
-              style={{
-                width: '50%', padding: '11px 20px',
-                borderRadius: 10, border: 'none', flexShrink: 0,
-                background: `linear-gradient(135deg, ${actionColor}, ${actionColor}cc)`,
-                color: '#fff',
-                fontWeight: 800, fontSize: 14, cursor: 'pointer',
-                letterSpacing: 0.5,
-                boxShadow: `0 4px 14px ${actionColor}44`,
-              }}
-            >
-              {isEnlightenReady ? '✨ Khai Sáng' : 'Nâng cấp'}
-            </button>
+            {(() => {
+              const canLevel = isEnlightenReady ? (enCost !== null) : totalExpGain > 0;
+              return (
+                <button
+                  onClick={onClose}
+                  disabled={!canLevel}
+                  style={{
+                    width: '50%', padding: '11px 20px',
+                    borderRadius: 10, border: 'none', flexShrink: 0,
+                    background: canLevel
+                      ? `linear-gradient(135deg, ${actionColor}, ${actionColor}cc)`
+                      : 'rgba(255,255,255,0.06)',
+                    color: canLevel ? '#fff' : '#475569',
+                    fontWeight: 800, fontSize: 14,
+                    cursor: canLevel ? 'pointer' : 'not-allowed',
+                    letterSpacing: 0.5,
+                    boxShadow: canLevel ? `0 4px 14px ${actionColor}44` : 'none',
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  {isEnlightenReady ? '✨ Khai Sáng' : 'Nâng cấp'}
+                </button>
+              );
+            })()}
           </div>
 
         </div>

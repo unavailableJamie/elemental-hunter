@@ -28,19 +28,16 @@ export const ENLIGHTENMENT_MATERIALS = {
 
 // ─── LEVEL-UP GOLD COST PER EXP, BY ENLIGHTENMENT BRACKET ───────────────────
 // Gold cost scales with the Enlightenment bracket the character is currently in.
+// Formula: Gold = totalEXP × ratio  (applies to ALL En levels including En.1)
 //
-// En.0 (Lv.1–20):  base rate — EXP_TO_GOLD_RATIO = 100  →  100 EXP = 1 Gold
-// En.1 (Lv.21–40): Gold:EXP = 100:1  →  1 EXP costs 100 Gold
-// En.2 (Lv.41–60): Gold:EXP = 200:1  →  1 EXP costs 200 Gold
-// En.3 (Lv.61–80): Gold:EXP = 300:1  →  1 EXP costs 300 Gold
-// En.4 (Lv.81–90): Gold:EXP = 500:1  →  1 EXP costs 500 Gold
-// En.5 (Lv.91–100):Gold:EXP = 800:1  →  1 EXP costs 800 Gold
+// En.1 (Lv.1–20):  100 Gold per 1 EXP
+// En.2 (Lv.21–40): 200 Gold per 1 EXP
+// En.3 (Lv.41–60): 300 Gold per 1 EXP
+// En.4 (Lv.61–80): 500 Gold per 1 EXP
+// En.5 (Lv.81–90): 800 Gold per 1 EXP
 //
 // Higher tiers cost more total Gold per level because they consume more EXP mats.
-export const EXP_TO_GOLD_RATIO = 100; // En.0 base: 100 EXP = 1 Gold
-
 export const LEVELUP_GOLD_RATIO_BY_EN: Record<number, number> = {
-  // En.1+: Gold per 1 EXP (multiply). Applies to all tiers equally.
   1: 100,
   2: 200,
   3: 300,
@@ -50,32 +47,28 @@ export const LEVELUP_GOLD_RATIO_BY_EN: Record<number, number> = {
 
 // ─── ENLIGHTENMENT LEVEL CAPS ─────────────────────────────────────────────────
 // Maximum character level allowed at each Enlightenment level.
-// En.0 = base (no enlightenment), En.5 = max for B/A tier.
+// En.1 = starting state (all characters begin here), En.5 = max for all tiers.
 export const ENLIGHTENMENT_LEVEL_CAPS: Record<number, number> = {
-  0: 20,
-  1: 40,
-  2: 60,
-  3: 80,
-  4: 90,
-  5: 100,
+  1: 20,
+  2: 40,
+  3: 60,
+  4: 80,
+  5: 90,
 };
 
-// ─── ENLIGHTENMENT GOLD RATIO ─────────────────────────────────────────────────
-// Gold : EnMat ratio per Enlightenment level.
-// Gold = totalEnMatsUsed × ratio. Higher En levels cost more Gold per mat.
-// Formula: Gold for En.N = sum(all EnMat quantities in En.N cost) × ratio[N]
-export const ENLIGHTENMENT_GOLD_RATIO: Record<number, number> = {
-  1: 100,   // 100 Gold per EnMat  → En.1: 7 mats × 100  =    700 Gold
-  2: 200,   // 200 Gold per EnMat  → En.2: 15 mats × 200 =  3,000 Gold
-  3: 300,   // 300 Gold per EnMat  → En.3: 15 mats × 300 =  4,500 Gold
-  4: 500,   // 500 Gold per EnMat  → En.4: 15 mats × 500 =  7,500 Gold
-  5: 800,   // 800 Gold per EnMat  → En.5: 13 mats × 800 = 10,400 Gold
+// ─── ENLIGHTENMENT GOLD COST (fixed per En level) ─────────────────────────────
+// Flat Gold cost to perform each Enlightenment upgrade. Not tied to mat count.
+export const ENLIGHTENMENT_GOLD_COST: Record<number, number> = {
+  2:   250_000,
+  3:   700_000,
+  4: 2_000_000,
+  5: 5_000_000,
 };
 
 // ─── ENLIGHTENMENT COSTS ──────────────────────────────────────────────────────
 // Materials needed to advance to En.N (from En.N-1).
 // Gold is NOT stored here — computed via computeEnlightenmentGold(enLevel).
-// Rule: 1–2 mat types for En.1–2; 2–3 mat types for En.3–5.
+// Rule: 1–2 mat types for En.2–3; 2–3 mat types for En.4–6.
 export interface EnlightenmentCost {
   EnMat1?: number;
   EnMat2?: number;
@@ -85,21 +78,20 @@ export interface EnlightenmentCost {
 }
 
 export const ENLIGHTENMENT_COSTS: Record<number, EnlightenmentCost> = {
-  1: { EnMat1: 5, EnMat2: 2                            },
-  2: { EnMat1: 8, EnMat2: 5, EnMat3: 2                },
-  3: {            EnMat2: 8, EnMat3: 5, EnMat4: 2      },
-  4: {                       EnMat3: 8, EnMat4: 5, EnMat5: 2 },
-  5: {                                  EnMat4: 8, EnMat5: 5 },
+  2: { EnMat1: 5, EnMat2: 2                            },
+  3: { EnMat1: 8, EnMat2: 5, EnMat3: 2                },
+  4: {            EnMat2: 8, EnMat3: 5, EnMat4: 2      },
+  5: {                       EnMat3: 8, EnMat4: 5, EnMat5: 2 },
 };
 
 // ─── TIER CAPS ────────────────────────────────────────────────────────────────
 // Maximum Enlightenment level each tier can reach.
 // Determines the absolute level ceiling for each tier.
 export const TIER_MAX_ENLIGHTENMENT: Record<Tier, number> = {
-  D: 3,  // max Lv.80
-  C: 4,  // max Lv.90
-  B: 5,  // max Lv.100
-  A: 5,  // max Lv.100
+  D: 3,  // max Lv.60
+  C: 4,  // max Lv.80
+  B: 5,  // max Lv.90
+  A: 5,  // max Lv.90
 };
 
 // ─── BASE STATS PER TIER (at Lv.1) ───────────────────────────────────────────
@@ -152,14 +144,12 @@ export const TIER_LEVELUP_COST: Record<Tier, LevelupCost[]> = {
     { minLevel:  1, maxLevel: 20, expN: 4, expR: 0, expSR: 0 },
     { minLevel: 21, maxLevel: 40, expN: 4, expR: 1, expSR: 0 },
     { minLevel: 41, maxLevel: 60, expN: 2, expR: 2, expSR: 0 },
-    { minLevel: 61, maxLevel: 80, expN: 0, expR: 3, expSR: 1 },
   ],
   C: [
     { minLevel:  1, maxLevel: 20, expN: 5, expR: 0, expSR: 0 },
     { minLevel: 21, maxLevel: 40, expN: 5, expR: 1, expSR: 0 },
     { minLevel: 41, maxLevel: 60, expN: 3, expR: 2, expSR: 0 },
     { minLevel: 61, maxLevel: 80, expN: 0, expR: 4, expSR: 1 },
-    { minLevel: 81, maxLevel: 90, expN: 0, expR: 2, expSR: 2 },
   ],
   B: [
     { minLevel:  1, maxLevel: 20, expN: 6, expR: 1, expSR: 0 },
@@ -167,7 +157,6 @@ export const TIER_LEVELUP_COST: Record<Tier, LevelupCost[]> = {
     { minLevel: 41, maxLevel: 60, expN: 2, expR: 3, expSR: 1 },
     { minLevel: 61, maxLevel: 80, expN: 0, expR: 4, expSR: 2 },
     { minLevel: 81, maxLevel: 90, expN: 0, expR: 2, expSR: 3 },
-    { minLevel: 91, maxLevel:100, expN: 0, expR: 0, expSR: 5 },
   ],
   A: [
     { minLevel:  1, maxLevel: 20, expN: 8, expR: 1, expSR: 0 },
@@ -175,17 +164,14 @@ export const TIER_LEVELUP_COST: Record<Tier, LevelupCost[]> = {
     { minLevel: 41, maxLevel: 60, expN: 2, expR: 4, expSR: 1 },
     { minLevel: 61, maxLevel: 80, expN: 0, expR: 5, expSR: 2 },
     { minLevel: 81, maxLevel: 90, expN: 0, expR: 3, expSR: 4 },
-    { minLevel: 91, maxLevel:100, expN: 0, expR: 0, expSR: 7 },
   ],
 };
 
 // ─── HELPER: gold cost for a given amount of EXP at a given En level ─────────
-// En.0: divide (cheap) — En.1+: multiply (expensive, scales per bracket).
+// Gold = totalEXP × LEVELUP_GOLD_RATIO_BY_EN[enLevel]. Falls back to En.1 ratio.
 export function levelupGoldForEXP(totalEXP: number, enLevel: number): number {
-  if (enLevel === 0 || !LEVELUP_GOLD_RATIO_BY_EN[enLevel]) {
-    return Math.floor(totalEXP / EXP_TO_GOLD_RATIO);
-  }
-  return totalEXP * LEVELUP_GOLD_RATIO_BY_EN[enLevel];
+  const ratio = LEVELUP_GOLD_RATIO_BY_EN[enLevel] ?? LEVELUP_GOLD_RATIO_BY_EN[1];
+  return totalEXP * ratio;
 }
 
 // ─── HELPER: aggregate material cost for a level range ───────────────────────
@@ -208,10 +194,25 @@ export function aggregateLevelupCost(
   return { expN, expR, expSR, gold: levelupGoldForEXP(totalExp, enLevel) };
 }
 
+// ─── EXP REQUIRED PER LEVEL ──────────────────────────────────────────────────
+// Each level requires more EXP than the previous — linear progression.
+// Formula: expToNextLevel(lv) = LEVEL_EXP_BASE + (lv - 1) × LEVEL_EXP_GROWTH
+// Applied universally across all tiers and Enlightenment brackets.
+export const LEVEL_EXP_BASE   = 1000; // EXP required to advance from Lv.1
+export const LEVEL_EXP_GROWTH =  200; // Additional EXP per level
+
+export function expToNextLevel(level: number): number {
+  return LEVEL_EXP_BASE + (level - 1) * LEVEL_EXP_GROWTH;
+}
+// Sample values:
+//   Lv.1 →  2: 1,000 EXP   Lv.20 → 21: 4,800 EXP
+//   Lv.40 → 41: 8,800 EXP  Lv.41 → 42: 9,000 EXP  (natural cross-bracket jump)
+//   Lv.60 → 61: 12,800 EXP Lv.80 → 81: 16,800 EXP Lv.100 → 101: 20,800 EXP
+
 // ─── HELPER: effective stat level ────────────────────────────────────────────
 // Stats increase when the EXP bar fills (not on the next level-up).
 // Filling Lv.N's EXP bar grants Lv.N+1 stats — this applies at ANY level
-// including the tier's absolute max (e.g. A-tier Lv.100 → shows Lv.101 stats).
+// including the tier's absolute max (e.g. A-tier Lv.90 → shows Lv.91 stats).
 // computeCharStats handles any level beyond the cap naturally via the formula.
 export function effectiveStatLevel(
   charLevel: number,
@@ -228,13 +229,7 @@ export function tierMaxLevel(tier: Tier): number {
 }
 
 // ─── HELPER: compute Enlightenment Gold cost ──────────────────────────────────
-// Gold for En.N = (total EnMat units used) × ENLIGHTENMENT_GOLD_RATIO[N].
-// Each EnMat, regardless of rarity, counts as 1 unit in this formula.
+// Returns the flat Gold cost for the given Enlightenment level upgrade.
 export function computeEnlightenmentGold(enLevel: number): number {
-  const cost  = ENLIGHTENMENT_COSTS[enLevel];
-  const ratio = ENLIGHTENMENT_GOLD_RATIO[enLevel];
-  if (!cost || !ratio) return 0;
-  const matKeys = ['EnMat1', 'EnMat2', 'EnMat3', 'EnMat4', 'EnMat5'] as const;
-  const totalMats = matKeys.reduce((sum, k) => sum + (cost[k] ?? 0), 0);
-  return totalMats * ratio;
+  return ENLIGHTENMENT_GOLD_COST[enLevel] ?? 0;
 }

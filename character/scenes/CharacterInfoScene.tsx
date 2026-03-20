@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { getCharById, TIER_COLOR, ELEMENT_COLOR, MOCK_INVENTORY } from '../data/mockCharacters.ts';
 import type { ComboPower } from '../data/mockCharacters.ts';
 import type { Element } from '../data/mockCharacters.ts';
-import { computeCharStats, effectiveStatLevel } from '../../config/characterBalance.ts';
+import { computeCharStats, effectiveStatLevel, expToNextLevel } from '../../config/characterBalance.ts';
 import { FireIcon, IceIcon, GrassIcon, RockIcon } from '../../components/Icons.tsx';
 import { EnlightenmentPips } from '../components/CharShared.tsx';
 import { LvlUpPopup } from '../components/LvlUpPopup.tsx';
+import { EnlightenPopup } from '../components/EnlightenPopup.tsx';
 import { SkillLvPopup } from '../components/SkillLvPopup.tsx';
 
 // ── Emoji fallback map ────────────────────────────────────────────────────────
@@ -147,23 +148,23 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
 }) => {
   const char = getCharById(charId);
   const [lvlUpOpen, setLvlUpOpen] = useState(false);
+  const [enlightenOpen, setEnlightenOpen] = useState(false);
   const [skillPopup, setSkillPopup] = useState<SkillPopupState>({ type: 'none' });
   const [enlightTooltip, setEnlightTooltip] = useState(false);
 
   const tierColor = TIER_COLOR[char.tier];
-  const derivedStats = computeCharStats(char.tier, effectiveStatLevel(char.charLevel, char.expCurrent, char.expNextLevel));
+  const curThreshold  = expToNextLevel(char.charLevel);
+  const derivedStats = computeCharStats(char.tier, effectiveStatLevel(char.charLevel, char.expCurrent, curThreshold));
   const isActive = activeCharId === char.id;
   const atMaxLevel = char.charLevel >= char.enlightenmentLevelCap;
-  const atCap = atMaxLevel && char.expCurrent >= char.expNextLevel;
+  const atCap = atMaxLevel && char.expCurrent >= curThreshold;
   const actionColor = atCap ? ENLIGHTEN_COLOR : LVLUP_COLOR;
   const bouncing = useBounce();
 
   const ElementIcon = ELEMENT_ICON_MAP[char.element];
   const elemColor = ELEMENT_COLOR[char.element];
 
-  const lvlPct = char.expNextLevel > 0
-    ? Math.min((char.expCurrent / char.expNextLevel) * 100, 100)
-    : 100;
+  const lvlPct = Math.min((char.expCurrent / curThreshold) * 100, 100);
 
   return (
     <div style={{
@@ -265,8 +266,8 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
         {/* Spacer */}
         <div style={{ flex: 1 }} />
 
-        {/* Gold display — only when lvlUp popup is open */}
-        {lvlUpOpen && (
+        {/* Gold display — when any upgrade popup is open */}
+        {(lvlUpOpen || enlightenOpen) && (
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -279,9 +280,6 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
             <span style={{ fontSize: 16 }}>🪙</span>
             <span style={{ fontSize: 14, fontWeight: 700, color: '#fbbf24' }}>
               {MOCK_INVENTORY.gold.toLocaleString()}
-            </span>
-            <span style={{ fontSize: 11, color: '#92772a', fontWeight: 600 }}>
-              Gold
             </span>
           </div>
         )}
@@ -466,7 +464,7 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
                 <span style={{ fontSize: 15, color: '#94a3b8' }}>/ {char.enlightenmentLevelCap}</span>
               </div>
               <button
-                onClick={() => setLvlUpOpen(true)}
+                onClick={() => atCap ? setEnlightenOpen(true) : setLvlUpOpen(true)}
                 style={{
                   padding: '9px 15px',
                   borderRadius: 9,
@@ -499,7 +497,7 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#64748b' }}>
               <span>EXP {char.expCurrent.toLocaleString()}</span>
-              <span>{char.expNextLevel.toLocaleString()}</span>
+              <span>{curThreshold.toLocaleString()}</span>
             </div>
           </div>
 
@@ -608,6 +606,9 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
       {/* ── Popups ─────────────────────────────────────────────────────────── */}
       {lvlUpOpen && (
         <LvlUpPopup char={char} onClose={() => setLvlUpOpen(false)} topOffset={TOP_BAR_H} />
+      )}
+      {enlightenOpen && (
+        <EnlightenPopup char={char} onClose={() => setEnlightenOpen(false)} topOffset={TOP_BAR_H} />
       )}
       {skillPopup.type === 'ultimate' && (
         <SkillLvPopup
