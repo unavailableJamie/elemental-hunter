@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/CPU60223_LOCAL/.claude/skills/workflow-assistant/references/**)",
+      "Read(//c/Users/CPU60223_LOCAL/.claude/skills/workflow-assistant/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\CPU60223_LOCAL\\.claude\\skills\\workflow-assistant"
+    ]
+  }
+}

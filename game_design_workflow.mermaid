@@ -1,0 +1,56 @@
+graph TB
+    Start([Bắt đầu: Ý tưởng Game/Feature]) --> Step1[1. Research & Ideation]
+    
+    Step1 --> Verify1{Verify: Idea có<br/>khả thi?}
+    Verify1 -->|Không| Refine1[Refine Concept]
+    Refine1 --> Step1
+    Verify1 -->|Có| Step2[2. Game Design Document GDD]
+    
+    Step2 --> Verify2{Verify: GDD<br/>đầy đủ?}
+    Verify2 -->|Không| Refine2[Bổ sung thiếu sót]
+    Refine2 --> Step2
+    Verify2 -->|Có| Step3[3. Core Mechanics Design]
+    
+    Step3 --> Verify3{Verify: Mechanics<br/>balanced & fun?}
+    Verify3 -->|Không| Refine3[Điều chỉnh parameters]
+    Refine3 --> Step3
+    Verify3 -->|Có| Step4[4. Prototype Development]
+    
+    Step4 --> Verify4{Verify: Prototype<br/>chạy được?}
+    Verify4 -->|Không| Debug4[Debug & Fix]
+    Debug4 --> Step4
+    Verify4 -->|Có| Step5[5. Playtesting]
+    
+    Step5 --> Verify5{Verify: Feedback<br/>tích cực?}
+    Verify5 -->|Major Issues| BackToStep3[Quay lại Step 3]
+    BackToStep3 --> Step3
+    Verify5 -->|Minor Issues| Refine5[Tweak & Polish]
+    Refine5 --> Step5
+    Verify5 -->|Tốt| Step6[6. Documentation & Assets]
+    
+    Step6 --> Verify6{Verify: Docs<br/>complete?}
+    Verify6 -->|Không| Refine6[Hoàn thiện docs]
+    Refine6 --> Step6
+    Verify6 -->|Có| Step7[7. Implementation Plan]
+    
+    Step7 --> Verify7{Verify: Plan<br/>feasible?}
+    Verify7 -->|Không| Adjust7[Điều chỉnh scope/timeline]
+    Adjust7 --> Step7
+    Verify7 -->|Có| End([Hoàn thành: Ready for Dev])
+    
+    style Start fill:#e1f5e1
+    style End fill:#e1f5e1
+    style Step1 fill:#fff4e6
+    style Step2 fill:#fff4e6
+    style Step3 fill:#fff4e6
+    style Step4 fill:#e3f2fd
+    style Step5 fill:#f3e5f5
+    style Step6 fill:#fff4e6
+    style Step7 fill:#fff4e6
+    style Verify1 fill:#ffebee
+    style Verify2 fill:#ffebee
+    style Verify3 fill:#ffebee
+    style Verify4 fill:#ffebee
+    style Verify5 fill:#ffebee
+    style Verify6 fill:#ffebee
+    style Verify7 fill:#ffebee
