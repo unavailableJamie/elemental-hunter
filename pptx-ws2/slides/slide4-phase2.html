@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #fff; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  font-family: Arial, sans-serif; display: flex; flex-direction: column;
+  background: #fff;
+}
+.header {
+  height: 56pt; background: #E07B1A; flex-shrink: 0;
+  display: flex; align-items: center; padding: 0 18pt; box-sizing: border-box; gap: 14pt;
+}
+.badge { background: rgba(255,255,255,0.22); border-radius: 6pt; padding: 4pt 12pt; }
+.badge p { font-size: 22pt; font-weight: 800; color: #fff; margin: 0; }
+.hdr-text h2 { font-size: 22pt; font-weight: 700; color: #fff; margin: 0 0 2pt 0; }
+.hdr-text p  { font-size: 10pt; color: rgba(255,255,255,0.85); margin: 0; }
+
+.prog-section { padding: 6pt 18pt 3pt; flex-shrink: 0; }
+.prog-bar { display: flex; height: 13pt; border-radius: 6pt; overflow: hidden; }
+.done-g  { background: #6EE7B7; flex: 60; display: flex; align-items: center; justify-content: center; }
+.done-g p { font-size: 8pt; font-weight: 700; color: #065F46; margin: 0; }
+.active-o { background: #E07B1A; flex: 20; display: flex; align-items: center; justify-content: center; }
+.active-o p { font-size: 8pt; font-weight: 700; color: #fff; margin: 0; }
+.dim { background: #CBD5E0; flex: 20; }
+.prog-ticks { display: flex; margin-top: 3pt; }
+.t60 { flex: 60; } .t20a { flex: 20; } .t20b { flex: 20; }
+.t60 p { font-size: 9pt; color: #059669; text-align: center; margin: 0; }
+.t20a p { font-size: 9pt; color: #E07B1A; font-weight: 700; text-align: center; margin: 0; }
+.t20b p { font-size: 9pt; color: #A0ADB8; text-align: center; margin: 0; }
+
+.content { flex: 1; display: flex; overflow: hidden; }
+.left { flex: 0 0 415pt; padding: 6pt 10pt 0 18pt; display: flex; flex-direction: column; gap: 4pt; }
+.section-label { font-size: 8.5pt; font-weight: 700; color: #94A3B8; letter-spacing: 0.08em; text-transform: uppercase; margin: 0; }
+.steps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5pt; flex: 1; }
+.sc {
+  background: #FEF3E4; border-left: 3pt solid #E07B1A; border-radius: 4pt;
+  padding: 7pt 8pt; display: flex; flex-direction: column; gap: 3pt;
+}
+.sc-top { display: flex; align-items: center; gap: 8pt; }
+.sn { flex-shrink: 0; width: 22pt; height: 22pt; background: #E07B1A; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.sn p { font-size: 11pt; font-weight: 700; color: #fff; margin: 0; text-align: center; }
+.sc p.st { font-size: 12pt; font-weight: 700; color: #1E2A38; margin: 0; line-height: 1.2; }
+.sc p.sd { font-size: 9.5pt; color: #7A5A30; margin: 0; padding-left: 30pt; line-height: 1.2; }
+
+.sep { height: 1pt; background: #CBD5E0; margin: 2pt 0 0 0; flex-shrink: 0; }
+.tip { background: #FEF3E4; border-left: 3pt solid #E07B1A; border-radius: 4pt; padding: 6pt 10pt; flex-shrink: 0; }
+.tip p { font-size: 11pt; color: #7A4A10; margin: 0; line-height: 1.4; }
+
+.right { flex: 1; padding: 6pt 14pt 0 6pt; display: flex; flex-direction: column; gap: 4pt; }
+.img-label { font-size: 8.5pt; font-weight: 700; color: #94A3B8; letter-spacing: 0.08em; text-transform: uppercase; margin: 0; text-align: center; }
+.img-row { display: flex; gap: 6pt; flex: 1; }
+.img-row img { flex: 1; min-width: 0; height: 100%; object-fit: cover; object-position: top; border-radius: 4pt; border: 1pt solid #CBD5E0; }
+.img-cap p { font-size: 8.5pt; color: #94A3B8; text-align: center; margin: 0; font-style: italic; }
+
+.footer {
+  width: 100%; height: 16pt; background: #F1F5F9; flex-shrink: 0;
+  display: flex; align-items: center; padding: 0 18pt; box-sizing: border-box;
+  justify-content: space-between;
+}
+.footer p { font-size: 8pt; color: #94A3B8; margin: 0; }
+.footer .f-accent { color: #E07B1A; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="badge"><p>+20%</p></div>
+  <div class="hdr-text">
+    <h2>Đi sâu vào từng Scene</h2>
+    <p>Dùng ảnh demo để AI code chính xác hơn · 60% → 80%</p>
+  </div>
+</div>
+<div class="prog-section">
+  <div class="prog-bar">
+    <div class="done-g"><p>Phase 1  60% ✓</p></div>
+    <div class="active-o"><p>▌ +20%</p></div>
+    <div class="dim"></div>
+  </div>
+  <div class="prog-ticks">
+    <div class="t60"><p>0% ─────────── 60% ✓</p></div>
+    <div class="t20a"><p>── 80% ✓</p></div>
+    <div class="t20b"><p>── 100%</p></div>
+  </div>
+</div>
+<div class="content">
+  <div class="left">
+    <p class="section-label">Các bước đi sâu</p>
+    <div class="steps-grid">
+      <div class="sc">
+        <div class="sc-top"><div class="sn"><p>1</p></div><p class="st">Ghép demo Figma</p></div>
+        <p class="sd">Cắt &amp; dán ảnh, không cần đẹp</p>
+      </div>
+      <div class="sc">
+        <div class="sc-top"><div class="sn"><p>2</p></div><p class="st">AI mô tả ảnh demo</p></div>
+        <p class="sd">Upload / link → AI diễn giải layout</p>
+      </div>
+      <div class="sc">
+        <div class="sc-top"><div class="sn"><p>3</p></div><p class="st">Xác nhận mô tả</p></div>
+        <p class="sd">Chỉnh nếu AI hiểu chưa đúng</p>
+      </div>
+      <div class="sc">
+        <div class="sc-top"><div class="sn"><p>4</p></div><p class="st">AI code theo mô tả</p></div>
+        <p class="sd">Dựa trên mô tả đã được duyệt</p>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div class="tip">
+      <p><b>💡 Tại sao?</b> AI mô tả ảnh → align kỳ vọng trước khi code, tránh sai lệch về layout.</p>
+    </div>
+  </div>
+  <div class="right">
+    <p class="img-label">Figma mockup → Code output</p>
+    <div class="img-row">
+      <img src="./character-info-ccn2-demo.png" alt="demo">
+      <img src="./character-info-skill-info-demo.png" alt="skill demo">
+    </div>
+    <div class="img-cap"><p>character-info · skill-info demo</p></div>
+  </div>
+</div>
+<div class="footer">
+  <p>Phase 2 · Đi sâu từng Scene</p>
+  <p class="f-accent">60% → 80%</p>
+</div>
+</body>
+</html>

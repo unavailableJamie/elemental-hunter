@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getCharById, TIER_COLOR, ELEMENT_COLOR, MOCK_INVENTORY } from '../data/mockCharacters.ts';
 import type { ComboPower } from '../data/mockCharacters.ts';
 import type { Element } from '../data/mockCharacters.ts';
@@ -8,6 +8,7 @@ import { EnlightenmentPips } from '../components/CharShared.tsx';
 import { LvlUpPopup } from '../components/LvlUpPopup.tsx';
 import { EnlightenPopup } from '../components/EnlightenPopup.tsx';
 import { SkillLvPopup } from '../components/SkillLvPopup.tsx';
+import { SkillInfoPopup } from '../components/SkillInfoPopup.tsx';
 
 // ── Emoji fallback map ────────────────────────────────────────────────────────
 const CHAR_EMOJI: Record<string, string> = {
@@ -54,6 +55,10 @@ const useBounce = () => {
 
 // ── Skill popup state ─────────────────────────────────────────────────────────
 type SkillPopupState = { type: 'none' } | { type: 'ultimate' } | { type: 'cpow'; id: string };
+
+// ── Skill panel view state ─────────────────────────────────────────────────────
+// index 0 = ultimate, 1+ = combo powers (matching SkillInfoPanel page order)
+type SkillPanelState = { open: false } | { open: true; startIndex: number };
 
 // ── Action colors ─────────────────────────────────────────────────────────────
 const LVLUP_COLOR     = '#3A7FF0';
@@ -151,6 +156,9 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
   const [enlightenOpen, setEnlightenOpen] = useState(false);
   const [skillPopup, setSkillPopup] = useState<SkillPopupState>({ type: 'none' });
   const [enlightTooltip, setEnlightTooltip] = useState(false);
+  const [enlightPos, setEnlightPos] = useState<{ x: number; y: number } | null>(null);
+  const enlightPipsRef = useRef<HTMLDivElement | null>(null);
+  const [skillPanel, setSkillPanel] = useState<SkillPanelState>({ open: false });
 
   const tierColor = TIER_COLOR[char.tier];
   const curThreshold  = expToNextLevel(char.charLevel);
@@ -425,32 +433,27 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
         {/* ── Group 1: Level + EXP + Stats ── */}
         <div style={{ flexShrink: 0 }}>
           <div style={{ marginBottom: 8 }}>
-            <div style={{ marginBottom: 4, position: 'relative', display: 'inline-block' }}
-              onMouseEnter={() => setEnlightTooltip(true)}
+            <div
+              ref={enlightPipsRef}
+              style={{ marginBottom: 4, display: 'inline-block', cursor: 'help' }}
+              onMouseEnter={() => {
+                const el = enlightPipsRef.current;
+                if (!el) return;
+                const rect = el.getBoundingClientRect();
+                setEnlightPos({ x: rect.left, y: rect.top + rect.height / 2 });
+                setEnlightTooltip(true);
+              }}
               onMouseLeave={() => setEnlightTooltip(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                const el = enlightPipsRef.current;
+                if (!el) return;
+                const rect = el.getBoundingClientRect();
+                setEnlightPos({ x: rect.left, y: rect.top + rect.height / 2 });
+                setEnlightTooltip(v => !v);
+              }}
             >
               <EnlightenmentPips current={char.enlightenment} max={char.enlightenmentMax} />
-              {enlightTooltip && (
-                <div style={{
-                  position: 'absolute',
-                  bottom: 'calc(100% + 6px)',
-                  left: 0,
-                  width: 248,
-                  background: '#1e293b',
-                  border: '1px solid #334155',
-                  borderRadius: 8,
-                  padding: '8px 10px',
-                  fontSize: 12,
-                  color: '#cbd5e1',
-                  lineHeight: 1.55,
-                  zIndex: 100,
-                  pointerEvents: 'none',
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.7)',
-                  textShadow: 'none',
-                }}>
-                  Tăng Cấp độ Khai Sáng để nâng giới hạn Lv tối đa. Nâng đến Lv tối đa để có thể mở Cấp độ Khai Sáng kế tiếp.
-                </div>
-              )}
             </div>
             <div style={{
               display: 'flex',
@@ -552,15 +555,15 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
               type="ultimate"
               isMax={char.ultimate.level === 2}
               tierColor={tierColor}
-              onClick={() => setSkillPopup({ type: 'ultimate' })}
+              onClick={() => setSkillPanel({ open: true, startIndex: 0 })}
             />
-            {char.comboPowers.map((pow: ComboPower) => (
+            {char.comboPowers.map((pow: ComboPower, i: number) => (
               <SkillThumb
                 key={pow.id}
                 type="cpow"
                 isMax={pow.isPlus}
                 tierColor={tierColor}
-                onClick={() => setSkillPopup({ type: 'cpow', id: pow.id })}
+                onClick={() => setSkillPanel({ open: true, startIndex: i + 1 })}
               />
             ))}
           </div>
@@ -603,7 +606,49 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
         </div>
       </div>
 
+      {/* ── Skill Info Popup ─────────────────────────────────────────────────── */}
+      {skillPanel.open && (
+        <SkillInfoPopup
+          char={char}
+          initialIndex={skillPanel.startIndex}
+          onClose={() => setSkillPanel({ open: false })}
+          topOffset={TOP_BAR_H}
+        />
+      )}
+
       {/* ── Popups ─────────────────────────────────────────────────────────── */}
+      {/* Enlightenment pips tooltip — fixed, left of pips cluster */}
+      {enlightTooltip && enlightPos && (
+        <div style={{
+          position: 'fixed',
+          top: enlightPos.y,
+          left: enlightPos.x - 10,
+          transform: 'translateX(-100%) translateY(-50%)',
+          zIndex: 9999,
+          background: '#0f172a',
+          border: '1px solid #6366f166',
+          borderRadius: 10,
+          padding: '10px 14px',
+          width: 230,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.85), 0 0 10px #6366f133',
+          pointerEvents: 'none',
+          fontFamily: "'Segoe UI', system-ui, sans-serif",
+        }}>
+          <div style={{
+            position: 'absolute',
+            right: -6, top: '50%',
+            transform: 'translateY(-50%)',
+            width: 0, height: 0,
+            borderTop: '6px solid transparent',
+            borderBottom: '6px solid transparent',
+            borderLeft: '6px solid #6366f166',
+          }} />
+          <div style={{ fontSize: 16, color: '#c7d2fe', lineHeight: 1.6, textShadow: 'none' }}>
+            Tăng Cấp độ Khai Sáng để nâng giới hạn Lv tối đa. Nâng đến Lv tối đa để có thể mở Cấp độ Khai Sáng kế tiếp.
+          </div>
+        </div>
+      )}
+
       {lvlUpOpen && (
         <LvlUpPopup char={char} onClose={() => setLvlUpOpen(false)} topOffset={TOP_BAR_H} />
       )}

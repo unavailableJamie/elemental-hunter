@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #fff; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  font-family: Arial, sans-serif; display: flex; flex-direction: column;
+  background: #fff;
+}
+.header {
+  height: 56pt; background: #7C3AED; flex-shrink: 0;
+  display: flex; align-items: center; padding: 0 18pt; box-sizing: border-box; gap: 14pt;
+}
+.badge { background: rgba(255,255,255,0.22); border-radius: 6pt; padding: 4pt 12pt; }
+.badge p { font-size: 22pt; font-weight: 800; color: #fff; margin: 0; }
+.hdr-text h2 { font-size: 22pt; font-weight: 700; color: #fff; margin: 0 0 2pt 0; }
+.hdr-text p  { font-size: 10pt; color: rgba(255,255,255,0.85); margin: 0; }
+
+.prog-section { padding: 6pt 18pt 3pt; flex-shrink: 0; }
+.prog-bar { display: flex; height: 13pt; border-radius: 6pt; overflow: hidden; }
+.done-g  { background: #6EE7B7; flex: 60; display: flex; align-items: center; justify-content: center; }
+.done-g p  { font-size: 8pt; font-weight: 700; color: #065F46; margin: 0; }
+.done-o  { background: #FDBA74; flex: 20; display: flex; align-items: center; justify-content: center; }
+.done-o p  { font-size: 8pt; font-weight: 700; color: #7C2D12; margin: 0; }
+.active-p { background: #7C3AED; flex: 20; display: flex; align-items: center; justify-content: center; }
+.active-p p { font-size: 8pt; font-weight: 700; color: #fff; margin: 0; }
+.prog-ticks { display: flex; margin-top: 3pt; }
+.t60 { flex: 60; } .t20a { flex: 20; } .t20b { flex: 20; }
+.t60 p  { font-size: 9pt; color: #059669; text-align: center; margin: 0; }
+.t20a p { font-size: 9pt; color: #E07B1A; text-align: center; margin: 0; }
+.t20b p { font-size: 9pt; color: #7C3AED; font-weight: 700; text-align: center; margin: 0; }
+
+.content { flex: 1; padding: 6pt 18pt 0; display: flex; flex-direction: column; gap: 5pt; }
+.section-label { font-size: 8.5pt; font-weight: 700; color: #94A3B8; letter-spacing: 0.08em; text-transform: uppercase; margin: 0; }
+
+.steps-row { display: flex; gap: 7pt; }
+.sc {
+  flex: 1; background: #F5F3FF; border-left: 3pt solid #7C3AED; border-radius: 4pt;
+  padding: 8pt 10pt; display: flex; flex-direction: column; gap: 3pt;
+}
+.sc-top { display: flex; align-items: center; gap: 8pt; }
+.sn { flex-shrink: 0; width: 22pt; height: 22pt; background: #7C3AED; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.sn p { font-size: 11pt; font-weight: 700; color: #fff; margin: 0; text-align: center; }
+.sc p.st { font-size: 12pt; font-weight: 700; color: #1E2A38; margin: 0; line-height: 1.2; }
+.sc p.sd { font-size: 9.5pt; color: #5B21B6; margin: 0; line-height: 1.2; }
+
+.reasons-row { display: flex; gap: 7pt; }
+.rc {
+  flex: 1; border: 1.5pt solid #7C3AED; border-radius: 6pt;
+  background: #F5F3FF; padding: 7pt 8pt; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2pt;
+}
+.rc-icon p { font-size: 18pt; margin: 0; }
+.rc-title p { font-size: 11pt; font-weight: 700; color: #7C3AED; margin: 0; }
+.rc-desc p  { font-size: 9.5pt; color: #1E2A38; margin: 0; line-height: 1.2; }
+
+.sep { height: 1pt; background: #CBD5E0; flex-shrink: 0; }
+.tip { background: #F5F3FF; border-left: 3pt solid #7C3AED; border-radius: 4pt; padding: 6pt 10pt; flex-shrink: 0; }
+.tip p { font-size: 11pt; color: #3D1A7A; margin: 0; line-height: 1.4; }
+
+.footer {
+  width: 100%; height: 16pt; background: #F1F5F9; flex-shrink: 0;
+  display: flex; align-items: center; padding: 0 18pt; box-sizing: border-box;
+  justify-content: space-between;
+}
+.footer p { font-size: 8pt; color: #94A3B8; margin: 0; }
+.footer .f-accent { color: #7C3AED; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="badge"><p>+20%</p></div>
+  <div class="hdr-text">
+    <h2>Fine-tune bằng tay</h2>
+    <p>Chỉnh chi tiết cuối — hoàn thành 100% sản phẩm · 80% → 100%</p>
+  </div>
+</div>
+<div class="prog-section">
+  <div class="prog-bar">
+    <div class="done-g"><p>Phase 1  60% ✓</p></div>
+    <div class="done-o"><p>Phase 2  80% ✓</p></div>
+    <div class="active-p"><p>▌ +20%</p></div>
+  </div>
+  <div class="prog-ticks">
+    <div class="t60"><p>0% ─────────── 60% ✓</p></div>
+    <div class="t20a"><p>── 80% ✓</p></div>
+    <div class="t20b"><p>── 100% ✓</p></div>
+  </div>
+</div>
+<div class="content">
+  <p class="section-label">Quy tắc fine-tune</p>
+  <div class="steps-row">
+    <div class="sc">
+      <div class="sc-top"><div class="sn"><p>1</p></div><p class="st">Mô tả chi tiết cần chỉnh</p></div>
+      <p class="sd">Dùng text, không nhờ AI dịch ảnh</p>
+    </div>
+    <div class="sc">
+      <div class="sc-top"><div class="sn"><p>2</p></div><p class="st">Request nhỏ / lần</p></div>
+      <p class="sd">1 request = 1 vấn đề duy nhất</p>
+    </div>
+    <div class="sc">
+      <div class="sc-top"><div class="sn"><p>3</p></div><p class="st">Kiểm tra ngay sau mỗi lần</p></div>
+      <p class="sd">Xác nhận trước khi tiếp tục</p>
+    </div>
+  </div>
+  <p class="section-label">Lý do quan trọng</p>
+  <div class="reasons-row">
+    <div class="rc">
+      <div class="rc-icon"><p>⚡</p></div>
+      <div class="rc-title"><p>Code nhanh hơn</p></div>
+      <div class="rc-desc"><p>Request nhỏ → ít lỗi hơn</p></div>
+    </div>
+    <div class="rc">
+      <div class="rc-icon"><p>🔍</p></div>
+      <div class="rc-title"><p>Dễ xác định lỗi</p></div>
+      <div class="rc-desc"><p>Ít thay đổi → biết ngay sai ở đâu</p></div>
+    </div>
+    <div class="rc">
+      <div class="rc-icon"><p>🛡</p></div>
+      <div class="rc-title"><p>Tránh mất tiến độ</p></div>
+      <div class="rc-desc"><p>Hết token / compact giữa chừng</p></div>
+    </div>
+    <div class="rc">
+      <div class="rc-icon"><p>🌱</p></div>
+      <div class="rc-title"><p>Design tiến hóa dần</p></div>
+      <div class="rc-desc"><p>Dễ theo dõi từng thay đổi</p></div>
+    </div>
+  </div>
+  <div class="sep"></div>
+  <div class="tip">
+    <p><b>✨ Tip:</b> Tránh gom nhiều request → khó kiểm chứng, AI dễ sót, design khó trace.</p>
+  </div>
+</div>
+<div class="footer">
+  <p>Phase 3 · Fine-tune bằng tay</p>
+  <p class="f-accent">80% → 100%</p>
+</div>
+</body>
+</html>

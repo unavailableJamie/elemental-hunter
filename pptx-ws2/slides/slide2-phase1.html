@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #fff; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  font-family: Arial, sans-serif; display: flex; flex-direction: column;
+  background: #fff;
+}
+.header {
+  height: 56pt; background: #059669; flex-shrink: 0;
+  display: flex; align-items: center; padding: 0 18pt; box-sizing: border-box; gap: 14pt;
+}
+.badge { background: rgba(255,255,255,0.22); border-radius: 6pt; padding: 4pt 12pt; }
+.badge p { font-size: 22pt; font-weight: 800; color: #fff; margin: 0; }
+.hdr-text h2 { font-size: 22pt; font-weight: 700; color: #fff; margin: 0 0 2pt 0; }
+.hdr-text p  { font-size: 10pt; color: rgba(255,255,255,0.85); margin: 0; }
+
+.prog-section { padding: 6pt 18pt 3pt; flex-shrink: 0; }
+.prog-bar { display: flex; height: 13pt; border-radius: 6pt; overflow: hidden; }
+.active { background: #059669; flex: 60; display: flex; align-items: center; justify-content: center; }
+.active p { font-size: 8pt; font-weight: 700; color: #fff; margin: 0; }
+.dim { background: #CBD5E0; flex: 20; }
+.prog-ticks { display: flex; margin-top: 3pt; }
+.t60 { flex: 60; } .t20a { flex: 20; } .t20b { flex: 20; }
+.t60 p { font-size: 9pt; color: #059669; font-weight: 700; text-align: center; margin: 0; }
+.t20a p, .t20b p { font-size: 9pt; color: #A0ADB8; text-align: center; margin: 0; }
+
+.content { flex: 1; display: flex; overflow: hidden; }
+.left { flex: 0 0 415pt; padding: 6pt 10pt 0 18pt; display: flex; flex-direction: column; gap: 4pt; }
+
+.section-label { font-size: 8.5pt; font-weight: 700; color: #94A3B8; letter-spacing: 0.08em; text-transform: uppercase; margin: 0; }
+
+.steps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5pt; flex: 1; }
+.sc {
+  background: #ECFDF5; border-left: 3pt solid #059669; border-radius: 4pt;
+  padding: 7pt 8pt; display: flex; align-items: flex-start; gap: 8pt;
+}
+.sn { flex-shrink: 0; width: 22pt; height: 22pt; background: #059669; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.sn p { font-size: 11pt; font-weight: 700; color: #fff; margin: 0; text-align: center; }
+.sc-text { display: flex; flex-direction: column; gap: 1pt; }
+.sc p.st { font-size: 12pt; font-weight: 700; color: #1E2A38; margin: 0; line-height: 1.2; }
+.sc p.sd { font-size: 9.5pt; color: #3D7A5C; margin: 0; line-height: 1.2; }
+
+.sep { height: 1pt; background: #CBD5E0; flex-shrink: 0; margin-top: 2pt; }
+.tip { background: #ECFDF5; border-left: 3pt solid #059669; border-radius: 4pt; padding: 5pt 10pt; flex-shrink: 0; }
+.tip p { font-size: 11pt; font-weight: 700; color: #065F46; margin: 0; }
+
+.right { flex: 1; padding: 6pt 14pt 0 6pt; display: flex; flex-direction: column; gap: 4pt; }
+.img-label { font-size: 8.5pt; font-weight: 700; color: #94A3B8; letter-spacing: 0.08em; text-transform: uppercase; margin: 0; text-align: center; }
+.img-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5pt; flex: 1; }
+.img-grid img { width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 4pt; border: 1pt solid #CBD5E0; }
+.img-cap p { font-size: 8.5pt; color: #94A3B8; text-align: center; margin: 0; font-style: italic; }
+
+.footer {
+  width: 100%; height: 16pt; background: #F1F5F9; flex-shrink: 0;
+  display: flex; align-items: center; padding: 0 18pt; box-sizing: border-box;
+  justify-content: space-between;
+}
+.footer p { font-size: 8pt; color: #94A3B8; margin: 0; }
+.footer .f-accent { color: #059669; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="badge"><p>60%</p></div>
+  <div class="hdr-text">
+    <h2>Khung ban đầu</h2>
+    <p>Xây dựng toàn bộ khung tính năng về mặt logic · 0% → 60%</p>
+  </div>
+</div>
+<div class="prog-section">
+  <div class="prog-bar">
+    <div class="active"><p>▌ Phase 1 · 0% → 60%</p></div>
+    <div class="dim"></div>
+    <div class="dim"></div>
+  </div>
+  <div class="prog-ticks">
+    <div class="t60"><p>0% ─────────────── 60% ✓</p></div>
+    <div class="t20a"><p>─── 80%</p></div>
+    <div class="t20b"><p>─── 100%</p></div>
+  </div>
+</div>
+<div class="content">
+  <div class="left">
+    <p class="section-label">Các bước chuẩn bị</p>
+    <div class="steps-grid">
+      <div class="sc">
+        <div class="sn"><p>1</p></div>
+        <div class="sc-text"><p class="st">List UI từ GDD</p><p class="sd">Liệt kê tất cả màn hình</p></div>
+      </div>
+      <div class="sc">
+        <div class="sn"><p>2</p></div>
+        <div class="sc-text"><p class="st">Chia thành Scene</p><p class="sd">Đặt tên nhất quán</p></div>
+      </div>
+      <div class="sc">
+        <div class="sn"><p>3</p></div>
+        <div class="sc-text"><p class="st">Tìm ảnh reference</p><p class="sd">Game tương tự / ý tưởng</p></div>
+      </div>
+      <div class="sc">
+        <div class="sn"><p>4</p></div>
+        <div class="sc-text"><p class="st">Upload / link ảnh ref</p><p class="sd">Chuẩn bị sẵn cho AI</p></div>
+      </div>
+      <div class="sc">
+        <div class="sn"><p>5</p></div>
+        <div class="sc-text"><p class="st">Format Scene Table</p><p class="sd">Bảng mô tả từng scene</p></div>
+      </div>
+      <div class="sc">
+        <div class="sn"><p>6</p></div>
+        <div class="sc-text"><p class="st">Xác định layout</p><p class="sd">Ngang / dọc cho từng scene</p></div>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div class="tip">
+      <p>✓  Sau bước này: khung logic hoàn thiện — ~60% sản phẩm đã hình thành</p>
+    </div>
+  </div>
+  <div class="right">
+    <p class="img-label">Ảnh tham khảo ví dụ</p>
+    <div class="img-grid">
+      <img src="./lobby.jpg" alt="lobby">
+      <img src="./character-list.png" alt="list">
+      <img src="./character-info-R1999.png" alt="info">
+      <img src="./character-info-lvlup-R1999.png" alt="lvlup">
+    </div>
+    <div class="img-cap"><p>lobby · character-list · character-info · lvlup</p></div>
+  </div>
+</div>
+<div class="footer">
+  <p>Phase 1 · Khung ban đầu</p>
+  <p class="f-accent">0% → 60%</p>
+</div>
+</body>
+</html>

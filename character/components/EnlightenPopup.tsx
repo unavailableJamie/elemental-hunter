@@ -64,6 +64,25 @@ export const EnlightenPopup: React.FC<EnlightenPopupProps> = ({
     { icon: '♥', label: 'HP',  value: currentStats.hp,  color: '#4ade80' },
   ];
 
+  // ── Enlightenment pips tooltip state ──────────────────────────────────────
+  const [enlightTooltip, setEnlightTooltip] = useState(false);
+  const [enlightPos, setEnlightPos] = useState<{ x: number; y: number } | null>(null);
+  const enlightPipsRef = useRef<HTMLDivElement | null>(null);
+
+  const openEnlightTooltip = () => {
+    const el = enlightPipsRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setEnlightPos({ x: rect.left, y: rect.top + rect.height / 2 });
+    setEnlightTooltip(true);
+  };
+  const closeEnlightTooltip = () => setEnlightTooltip(false);
+  const toggleEnlightTooltip = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (enlightTooltip) closeEnlightTooltip();
+    else openEnlightTooltip();
+  };
+
   // ── Tooltip state ─────────────────────────────────────────────────────────
   const [tooltipMat, setTooltipMat] = useState<EnMatKey | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
@@ -138,7 +157,13 @@ export const EnlightenPopup: React.FC<EnlightenPopupProps> = ({
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 8px' }}>
 
           {/* Custom pips: filled pips + next pip blinks */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <div
+            ref={enlightPipsRef}
+            style={{ display: 'inline-flex', gap: 6, marginBottom: 8, cursor: 'help' }}
+            onMouseEnter={openEnlightTooltip}
+            onMouseLeave={closeEnlightTooltip}
+            onClick={toggleEnlightTooltip}
+          >
             {Array.from({ length: char.enlightenmentMax }).map((_, i) => {
               const filled  = i < char.enlightenment;
               const isNext  = i === char.enlightenment;
@@ -338,6 +363,38 @@ export const EnlightenPopup: React.FC<EnlightenPopupProps> = ({
 
         </div>
       </div>
+
+      {/* Enlightenment pips tooltip — fixed, left of pips cluster */}
+      {enlightTooltip && enlightPos && (
+        <div style={{
+          position: 'fixed',
+          top: enlightPos.y,
+          left: enlightPos.x - 10,
+          transform: 'translateX(-100%) translateY(-50%)',
+          zIndex: 9999,
+          background: '#0f172a',
+          border: '1px solid #6366f166',
+          borderRadius: 10,
+          padding: '10px 14px',
+          width: 230,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.85), 0 0 10px #6366f133',
+          pointerEvents: 'none',
+          fontFamily: "'Segoe UI', system-ui, sans-serif",
+        }}>
+          <div style={{
+            position: 'absolute',
+            right: -6, top: '50%',
+            transform: 'translateY(-50%)',
+            width: 0, height: 0,
+            borderTop: '6px solid transparent',
+            borderBottom: '6px solid transparent',
+            borderLeft: '6px solid #6366f166',
+          }} />
+          <div style={{ fontSize: 16, color: '#c7d2fe', lineHeight: 1.6 }}>
+            Tăng Cấp độ Khai Sáng để nâng giới hạn Lv tối đa. Nâng đến Lv tối đa để có thể mở Cấp độ Khai Sáng kế tiếp.
+          </div>
+        </div>
+      )}
 
       {/* ── Fixed tooltip ── */}
       {tooltipMat && tooltipPos && (() => {

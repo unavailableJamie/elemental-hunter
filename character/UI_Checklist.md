@@ -28,17 +28,33 @@
 - [ ] Loại phần thưởng tại từng mốc (Stat Bonus / C.Pow lvUP / Ulti lvUP)
 
 ## E. Combo Powers
+
+### Panel KỸ NĂNG — Container chung (dùng chung cho cả Combo và Ultimate)
+- [ ] Section header "KỸ NĂNG"
+- [ ] Navigation arrows ◄ ► để chuyển giữa các kỹ năng (số trang = số Combo Powers + 1 Ultimate)
+- [ ] Skill icon — hình vuông bo góc ~60×60px, nền tối, icon bên trong
+- [ ] Skill name — text trắng ~18–20px bold
+- [ ] Skill type badge — label nhỏ ~12px phía dưới tên ("Kỹ năng combo" hoặc "Kỹ năng chủ động")
+
+### Nội dung Combo Skill
 - [ ] C.Pow 1 — luôn hiển thị, trạng thái: cấp 1 hoặc 1+
 - [ ] C.Pow 2 — chỉ hiển thị nếu Tier C trở lên, trạng thái: cấp 1 hoặc 2+
 - [ ] C.Pow 3 — chỉ hiển thị nếu Tier A, trạng thái: cấp 1 hoặc 3+
-- [ ] Mô tả hiệu ứng của từng C.Pow
+- [ ] Row "Cơ bản" — pill label xanh lá + mô tả hiệu ứng cấp 1
+- [ ] Row "Đặc biệt" — pill label vàng/cam + mô tả hiệu ứng cấp "+" (khi chưa unlock)
+- [ ] Row unlock condition — icon 🔒 + text "Mở khóa tại Dup Lv X" (mờ/xám khi locked)
+- [ ] Khi đã unlock cấp "+": row "Đặc biệt" đổi sang active state (nền sáng hơn, label đổi màu)
 
 ## F. Ultimate
-- [ ] Tên kỹ năng (ví dụ: Extra Roll)
-- [ ] Cấp Ultimate (Lv 1 / Lv 2)
-- [ ] MAG Cost tại cấp hiện tại
-- [ ] Mô tả hiệu ứng
-- [ ] Thông tin upgrade Lv2 nếu chưa đạt (ví dụ: "Lv2: Giảm MAG Cost từ 70 → 50")
+
+### Nội dung Ultimate Skill
+- [ ] Tên kỹ năng (ví dụ: "Singularity +")
+- [ ] Row "Cơ bản" — pill label xanh lá + MAG Cost badge (ví dụ: "90 MAG", teal pill, góc phải) + mô tả hiệu ứng Lv1
+- [ ] Row "Đặc biệt" — pill label + MAG Cost badge Lv2 (ví dụ: "70 MAG") + mô tả hiệu ứng Lv2
+- [ ] Row điều kiện — text "Điều kiện: Dup X"
+  - Locked: icon 🔒, nền tối/mờ
+  - Unlocked: icon ✅ / nền xanh lá, toàn bộ row "Đặc biệt" chuyển sang active state
+- [ ] MAG Cost badge — hiển thị khác nhau giữa Lv1 và Lv2 để player thấy sự cải thiện
 
 ---
 

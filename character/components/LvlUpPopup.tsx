@@ -104,6 +104,25 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const slotRefs = useRef<Partial<Record<MatKey, HTMLDivElement | null>>>({});
 
+  // ── Enlightenment tooltip state ────────────────────────────────────────────
+  const [enlightTooltip, setEnlightTooltip] = useState(false);
+  const [enlightPos, setEnlightPos] = useState<{ x: number; y: number } | null>(null);
+  const enlightPipsRef = useRef<HTMLDivElement | null>(null);
+
+  const openEnlightTooltip = () => {
+    const el = enlightPipsRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setEnlightPos({ x: rect.left, y: rect.top + rect.height / 2 });
+    setEnlightTooltip(true);
+  };
+  const closeEnlightTooltip = () => setEnlightTooltip(false);
+  const toggleEnlightTooltip = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (enlightTooltip) closeEnlightTooltip();
+    else openEnlightTooltip();
+  };
+
   const getSlotPos = (key: MatKey) => {
     const el = slotRefs.current[key];
     if (!el) return null;
@@ -279,7 +298,13 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 16px 8px' }}>
 
           {/* Enlightenment pips */}
-          <div style={{ marginBottom: 8 }}>
+          <div
+            ref={enlightPipsRef}
+            style={{ marginBottom: 8, cursor: 'help', display: 'inline-block' }}
+            onMouseEnter={openEnlightTooltip}
+            onMouseLeave={closeEnlightTooltip}
+            onClick={toggleEnlightTooltip}
+          >
             <EnlightenmentPips current={char.enlightenment} max={char.enlightenmentMax} />
           </div>
 
@@ -292,8 +317,8 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
               <span style={{ fontSize: 15, color: '#94a3b8' }}>/ {lvCap}</span>
               {displayDelta > 0 && (
                 <span style={{
-                  fontSize: 12, fontWeight: 700, color: '#fff',
-                  background: '#92400e',
+                  fontSize: 12, fontWeight: 700, color: '#FFFFFF',
+                  background: '#B7770D',
                   borderRadius: 4, padding: '2px 7px',
                   marginLeft: 2,
                   lineHeight: 1.4,
@@ -651,6 +676,41 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
         </div>
 
       </div>
+
+      {/* Enlightenment tooltip — fixed, left of pips cluster */}
+      {enlightTooltip && enlightPos && (
+        <div
+          style={{
+            position: 'fixed',
+            top: enlightPos.y,
+            left: enlightPos.x - 10,
+            transform: 'translateX(-100%) translateY(-50%)',
+            zIndex: 9999,
+            background: '#0f172a',
+            border: '1px solid #6366f166',
+            borderRadius: 10,
+            padding: '10px 14px',
+            width: 230,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.85), 0 0 10px #6366f133',
+            pointerEvents: 'none',
+            fontFamily: "'Segoe UI', system-ui, sans-serif",
+          }}
+        >
+          {/* Arrow on right side pointing toward pips */}
+          <div style={{
+            position: 'absolute',
+            right: -6, top: '50%',
+            transform: 'translateY(-50%)',
+            width: 0, height: 0,
+            borderTop: '6px solid transparent',
+            borderBottom: '6px solid transparent',
+            borderLeft: '6px solid #6366f166',
+          }} />
+          <div style={{ fontSize: 16, color: '#c7d2fe', lineHeight: 1.6 }}>
+            Tăng Cấp độ Khai Sáng để nâng giới hạn Lv tối đa. Nâng đến Lv tối đa để có thể mở Cấp độ Khai Sáng kế tiếp.
+          </div>
+        </div>
+      )}
 
       {/* Fixed tooltip — renders above all overflow:hidden ancestors */}
       {tooltipMat && tooltipPos && (() => {

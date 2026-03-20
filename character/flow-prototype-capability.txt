@@ -1,7 +1,9 @@
-flow prototype / capability:
-- find reference -> take screenshots 
-- ask to extract necessary info and elements from text description/GDD => confirm => save into a checklist.
-- (optional) wired the screenshot / describe their positions by text, link with references, OR, demo each scene step-by-step, with each scene linked to a reference.
+Các bước lần lượt là:
+**60% - Khung ban đầu**
+- Tui yêu cầu AI liệt kê list các UI cần thiết để làm tính năng, dựa trên GDD của tính năng.
+- Chia thành các scene để rõ ràng hơn nếu có thể.
+- Tui đi tìm ảnh tham khảo hoặc screenshot.
+- Upload ảnh hoặc cung cấp đường dẫn đến các ảnh tham khảo (reference) cho từng scene/UI.
 - format các scene viết thành bảng | | | | | | để tả đủ tiêu chí, vd:
 | # | Scene | Ảnh tham khảo trong folder UI reference | Note |
 | 1 | Lobby | lobby | scene đầu tiên khi vào game |
@@ -10,8 +12,18 @@ flow prototype / capability:
 | 4 | character-info-lvlup | character-info-lvlup-R1999 | mở popup nâng cấp ngay ở scene character-info, khi bấm vào nút nâng cấp, hoặc nút "+" gần chỗ level của nhân vật |
 | 5 | character-info-skilllv | character-info-skilllv-R1999 | popup mở ở scene character-info khi người chơi bấm vào phần skill/Ultimate của nhân vật, hiện các cấp của skill đó, kèm điều kiện mở (nâng cấp DUP) |
 - Xác định thiết kế layout ngang hay dọc (landscape or vertical)
-- khi muốn dựng layout theo ảnh reference, yêu cầu tả lại cách hiểu layout trước, người dùng xác nhận thì mới bắt đầu build theo.
-- prototype từng chút một, gõ từng phần request nhỏ nếu có thể. Code nhanh, dễ xác định lỗi, design cũng dễ để "tiến hóa" theo. Đỡ xảy ra trường hợp hết token khi đang sửa dở, hoặc session đạt giới hạn chat và cần compact. Hoặc đơn giản là design khó theo dõi được yêu cầu để kiểm chứng khi yêu cầu 1 khối lượng sửa quá nhiều cùng lúc.
+- Xong bước này thì thường tính năng gần đủ hết các thứ về mặt logic.
+*** Chú thích: Đôi khi phải cung cấp 1 balance demo để có thể demo tiếp. Nên sẽ nhảy sang làm khung balance song song.
+
+**20% - Đi sâu vào từng scene**
+- Tự ghép 1 ảnh demo giống mong muốn nhất có thể bằng Figma. Cắt và dán cũng được.
+- Up hoặc link đến ảnh demo, yêu cầu AI mô tả lại những thứ nhìn thấy trong ảnh demo.
+- Xác nhận hoặc chỉnh sửa mô tả => yêu cầu AI code.
+
+**20% - Fine-tune bằng tay**
+- Tả và yêu cầu AI chỉnh sửa chính xác những chi tiết cuối để được như mong muốn.
+- Khó trông chờ vào AI "dịch" ảnh để làm được tốt đoạn này, hiện tự chỉnh bằng mô tả trực tiếp vẫn đem lại hiệu quả cao hơn.
+- sửa từng chút một, gõ từng phần request nhỏ nếu có thể. Mục đích để code nhanh, dễ xác định lỗi, design cũng dễ để "tiến hóa" theo. Đỡ xảy ra trường hợp hết token khi đang sửa dở, hoặc session đạt giới hạn chat và cần compact. Hoặc đơn giản là design khó theo dõi được yêu cầu để kiểm chứng khi yêu cầu 1 khối lượng sửa quá nhiều cùng lúc.
 
 - dựng prototype
 - viết balance
