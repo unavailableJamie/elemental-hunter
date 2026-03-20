@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { TIER_COLOR, MOCK_INVENTORY } from '../data/mockCharacters.ts';
-import type { CharacterData } from '../data/mockCharacters.ts';
+import type { CharacterData, SessionInventory } from '../data/mockCharacters.ts';
 import { EnlightenmentPips } from './CharShared.tsx';
 import {
   computeCharStats,
@@ -22,6 +22,10 @@ interface LvlUpPopupProps {
   char: CharacterData;
   onClose: () => void;
   topOffset?: number;
+  sessionChar?: CharacterData;
+  sessionInventory?: SessionInventory;
+  onLvlUpConfirm?: (newChar: CharacterData, newInventory: SessionInventory) => void;
+  onSwitchToEnlighten?: (newChar: CharacterData, newInventory: SessionInventory) => void;
 }
 
 // ── Material chip (enlightenment mode only) ───────────────────────────────────
@@ -84,12 +88,27 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
   char,
   onClose,
   topOffset = 0,
+  sessionChar,
+  sessionInventory,
+  onLvlUpConfirm,
+  onSwitchToEnlighten,
 }) => {
-  const lvCap            = char.enlightenmentLevelCap;
-  const isAtLevelCap     = char.charLevel >= lvCap;
-  const isEnlightenReady = isAtLevelCap && char.expCurrent >= expToNextLevel(char.charLevel);
+  const activeChar      = sessionChar ?? char;
+  const activeInventory: SessionInventory = sessionInventory ?? { ...MOCK_INVENTORY };
 
-  const tierColor   = TIER_COLOR[char.tier];
+  const lvCap            = activeChar.enlightenmentLevelCap;
+  const isAtLevelCap     = activeChar.charLevel >= lvCap;
+  const isEnlightenReady = isAtLevelCap && activeChar.expCurrent >= expToNextLevel(activeChar.charLevel);
+
+  // Auto-switch to Enlighten popup the moment the character becomes enlighten-ready
+  React.useEffect(() => {
+    if (isEnlightenReady) {
+      onSwitchToEnlighten?.(activeChar, activeInventory);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEnlightenReady]);
+
+  const tierColor   = TIER_COLOR[activeChar.tier];
   const actionColor = isEnlightenReady ? ENLIGHTEN_COLOR : LVLUP_COLOR;
 
   // ── Material slot state ───────────────────────────────────────────────────
@@ -167,7 +186,7 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
   };
 
   const adjustQty = (key: MatKey, delta: number) => {
-    const owned = MOCK_INVENTORY[key];
+    const owned = activeInventory[key];
     setMatQty(prev => ({
       ...prev,
       [key]: Math.max(0, Math.min(prev[key] + delta, owned)),
@@ -180,9 +199,9 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
                      + matQty.ExpSR * EXP_MATERIALS.ExpSR.expValue;
 
   const { simLv, simExp } = simulateExp(
-    char.charLevel, char.expCurrent, lvCap, totalExpGain,
+    activeChar.charLevel, activeChar.expCurrent, lvCap, totalExpGain,
   );
-  const previewLvDelta = simLv - char.charLevel;
+  const previewLvDelta = simLv - activeChar.charLevel;
   const expIsFull      = simLv >= lvCap && simExp >= expToNextLevel(simLv);
 
   // ── Auto-select: minimize wasted EXP ─────────────────────────────────────
@@ -190,9 +209,10 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
   // Only ceil at the N layer (last resort) — max waste is vN-1 = 199 EXP.
   // If small stones are exhausted, bump up the next tier by 1.
   const autoSelect = () => {
-    // Sum EXP needed: remaining in current level + each subsequent level up to cap
-    let expNeeded = expToNextLevel(char.charLevel) - char.expCurrent;
-    for (let lv = char.charLevel + 1; lv < lvCap; lv++) {
+    // Sum EXP needed: remaining in current level + each level up to AND including lvCap
+    // (filling the bar at lvCap triggers isEnlightenReady)
+    let expNeeded = expToNextLevel(activeChar.charLevel) - activeChar.expCurrent;
+    for (let lv = activeChar.charLevel + 1; lv <= lvCap; lv++) {
       expNeeded += expToNextLevel(lv);
     }
     if (expNeeded <= 0) { setMatQty({ ExpN: 0, ExpR: 0, ExpSR: 0 }); return; }
@@ -200,9 +220,9 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
     const vSR = EXP_MATERIALS.ExpSR.expValue;
     const vR  = EXP_MATERIALS.ExpR.expValue;
     const vN  = EXP_MATERIALS.ExpN.expValue;
-    const maxSR = MOCK_INVENTORY.ExpSR;
-    const maxR  = MOCK_INVENTORY.ExpR;
-    const maxN  = MOCK_INVENTORY.ExpN;
+    const maxSR = activeInventory.ExpSR;
+    const maxR  = activeInventory.ExpR;
+    const maxN  = activeInventory.ExpN;
 
     // Floor for SR: don't overshoot by a whole SR stone
     let useSR = Math.min(maxSR, Math.floor(expNeeded / vSR));
@@ -237,23 +257,23 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
   };
 
   // ── Bar percentages ───────────────────────────────────────────────────────
-  const curThreshold  = expToNextLevel(char.charLevel);
+  const curThreshold  = expToNextLevel(activeChar.charLevel);
   const simThreshold  = expToNextLevel(simLv);
-  const lvlPct     = Math.min((char.expCurrent / curThreshold) * 100, 100);
+  const lvlPct     = Math.min((activeChar.expCurrent / curThreshold) * 100, 100);
   const previewPct = Math.min((simExp / simThreshold) * 100, 100);
 
   // ── Display level & delta ─────────────────────────────────────────────────
   const hasMatPreview = totalExpGain > 0;
-  const displayLevel  = hasMatPreview ? char.charLevel + previewLvDelta : char.charLevel;
+  const displayLevel  = hasMatPreview ? activeChar.charLevel + previewLvDelta : activeChar.charLevel;
   const displayDelta  = hasMatPreview ? previewLvDelta : 0;
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   // Stat gain fires when EXP bar fills — so effective level = charLevel+1 when exp is full.
-  const effLvBefore = effectiveStatLevel(char.charLevel, char.expCurrent, curThreshold);
+  const effLvBefore = effectiveStatLevel(activeChar.charLevel, activeChar.expCurrent, curThreshold);
   const effLvAfter  = effectiveStatLevel(simLv, simExp, simThreshold);
-  const statsBefore = computeCharStats(char.tier, effLvBefore);
-  const statsAfter  = computeCharStats(char.tier, hasMatPreview ? effLvAfter : effLvBefore);
-  const enCost      = isAtLevelCap ? ENLIGHTENMENT_COSTS[char.enlightenment + 1] : null;
+  const statsBefore = computeCharStats(activeChar.tier, effLvBefore);
+  const statsAfter  = computeCharStats(activeChar.tier, hasMatPreview ? effLvAfter : effLvBefore);
+  const enCost      = isAtLevelCap ? ENLIGHTENMENT_COSTS[activeChar.enlightenment + 1] : null;
   const showDelta   = hasMatPreview && effLvAfter > effLvBefore;
 
   const stats = [
@@ -266,9 +286,27 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
   // Level-up: gold rate depends on char's current En bracket (En.0=cheap, En.1+=expensive).
   // Enlightenment: totalEnMats × ratio[En level].
   const goldCost = isEnlightenReady
-    ? computeEnlightenmentGold(char.enlightenment + 1)
-    : levelupGoldForEXP(totalExpGain, char.enlightenment);
-  const goldShort = goldCost > MOCK_INVENTORY.gold;
+    ? computeEnlightenmentGold(activeChar.enlightenment + 1)
+    : levelupGoldForEXP(totalExpGain, activeChar.enlightenment);
+  const goldShort = goldCost > activeInventory.gold;
+
+  const handleConfirm = () => {
+    if (isEnlightenReady) {
+      onSwitchToEnlighten?.(activeChar, activeInventory);
+    } else {
+      const newChar: CharacterData = { ...activeChar, charLevel: simLv, expCurrent: simExp };
+      const newInventory: SessionInventory = {
+        ...activeInventory,
+        gold: activeInventory.gold - goldCost,
+        ExpN: activeInventory.ExpN - matQty.ExpN,
+        ExpR: activeInventory.ExpR - matQty.ExpR,
+        ExpSR: activeInventory.ExpSR - matQty.ExpSR,
+      };
+      onLvlUpConfirm?.(newChar, newInventory);
+      setMatQty({ ExpN: 0, ExpR: 0, ExpSR: 0 });
+      setSelectedMat(null);
+    }
+  };
 
   return (
     <>
@@ -305,7 +343,7 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
             onMouseLeave={closeEnlightTooltip}
             onClick={toggleEnlightTooltip}
           >
-            <EnlightenmentPips current={char.enlightenment} max={char.enlightenmentMax} />
+            <EnlightenmentPips current={activeChar.enlightenment} max={activeChar.enlightenmentMax} />
           </div>
 
           {/* Level row: Lv.X/Y then +delta badge outside */}
@@ -364,7 +402,7 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
               )}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#64748b' }}>
-              <span>EXP {(hasMatPreview ? simExp : char.expCurrent).toLocaleString()}</span>
+              <span>EXP {(hasMatPreview ? simExp : activeChar.expCurrent).toLocaleString()}</span>
               <span>{(hasMatPreview ? simThreshold : curThreshold).toLocaleString()}</span>
             </div>
           </div>
@@ -456,7 +494,7 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
                             key={k}
                             label={ENLIGHTENMENT_MATERIALS[k].label}
                             qty={(enCost as Record<string, number>)[k]}
-                            owned={MOCK_INVENTORY[k]}
+                            owned={activeInventory[k]}
                             color={ENLIGHTENMENT_MATERIALS[k].color}
                           />
                         ))
@@ -475,7 +513,7 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
                 {/* Slot row */}
                 <div style={{ display: 'flex', gap: 8, position: 'relative' }}>
                   {MAT_DEFS.map(({ key, color, label, description }) => {
-                    const owned     = MOCK_INVENTORY[key];
+                    const owned     = activeInventory[key];
                     const qty       = matQty[key];
                     const isSel     = selectedMat === key;
                     const isFlash   = flashMat === key;
@@ -550,7 +588,7 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
                 {/* Qty control row — only when a slot is selected */}
                 {selectedMat && (() => {
                   const selDef  = MAT_DEFS.find(m => m.key === selectedMat)!;
-                  const owned   = MOCK_INVENTORY[selectedMat];
+                  const owned   = activeInventory[selectedMat];
                   const qty     = matQty[selectedMat];
                   const plusDis = qty >= owned || expIsFull;
                   const minusDis = qty <= 0;
@@ -648,10 +686,10 @@ export const LvlUpPopup: React.FC<LvlUpPopupProps> = ({
 
             {/* Confirm button — half width, right side */}
             {(() => {
-              const canLevel = isEnlightenReady ? (enCost !== null) : totalExpGain > 0;
+              const canLevel = isEnlightenReady ? (enCost !== null) : (totalExpGain > 0 && !goldShort);
               return (
                 <button
-                  onClick={onClose}
+                  onClick={handleConfirm}
                   disabled={!canLevel}
                   style={{
                     width: '50%', padding: '11px 20px',

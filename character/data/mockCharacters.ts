@@ -412,3 +412,10 @@ export const MOCK_INVENTORY = {
   EnMat4: 100,
   EnMat5: 100,
 } as const;
+
+// Mutable session inventory (for popup test flows — reset on close)
+export type SessionInventory = {
+  gold: number;
+  ExpN: number; ExpR: number; ExpSR: number;
+  EnMat1: number; EnMat2: number; EnMat3: number; EnMat4: number; EnMat5: number;
+};

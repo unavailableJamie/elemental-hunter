@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getCharById, TIER_COLOR, ELEMENT_COLOR, MOCK_INVENTORY } from '../data/mockCharacters.ts';
-import type { ComboPower } from '../data/mockCharacters.ts';
+import type { ComboPower, CharacterData, SessionInventory } from '../data/mockCharacters.ts';
 import type { Element } from '../data/mockCharacters.ts';
 import { computeCharStats, effectiveStatLevel, expToNextLevel } from '../../config/characterBalance.ts';
 import { FireIcon, IceIcon, GrassIcon, RockIcon } from '../../components/Icons.tsx';
@@ -154,11 +154,39 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
   const char = getCharById(charId);
   const [lvlUpOpen, setLvlUpOpen] = useState(false);
   const [enlightenOpen, setEnlightenOpen] = useState(false);
+  const [session, setSession] = useState<{ char: CharacterData; inventory: SessionInventory } | null>(null);
   const [skillPopup, setSkillPopup] = useState<SkillPopupState>({ type: 'none' });
   const [enlightTooltip, setEnlightTooltip] = useState(false);
   const [enlightPos, setEnlightPos] = useState<{ x: number; y: number } | null>(null);
   const enlightPipsRef = useRef<HTMLDivElement | null>(null);
   const [skillPanel, setSkillPanel] = useState<SkillPanelState>({ open: false });
+
+  const openLvlUp = () => {
+    setSession({ char: { ...char }, inventory: { ...MOCK_INVENTORY } });
+    setLvlUpOpen(true);
+  };
+  const openEnlighten = () => {
+    setSession({ char: { ...char }, inventory: { ...MOCK_INVENTORY } });
+    setEnlightenOpen(true);
+  };
+  const closePopup = () => {
+    setSession(null);
+    setLvlUpOpen(false);
+    setEnlightenOpen(false);
+  };
+  const handleLvlUpConfirm = (newChar: CharacterData, newInventory: SessionInventory) => {
+    setSession({ char: newChar, inventory: newInventory });
+  };
+  const handleSwitchToEnlighten = (newChar: CharacterData, newInventory: SessionInventory) => {
+    setSession({ char: newChar, inventory: newInventory });
+    setLvlUpOpen(false);
+    setEnlightenOpen(true);
+  };
+  const handleEnlightenConfirm = (newChar: CharacterData, newInventory: SessionInventory) => {
+    setSession({ char: newChar, inventory: newInventory });
+    setEnlightenOpen(false);
+    setLvlUpOpen(true);
+  };
 
   const tierColor = TIER_COLOR[char.tier];
   const curThreshold  = expToNextLevel(char.charLevel);
@@ -287,7 +315,7 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
           }}>
             <span style={{ fontSize: 16 }}>🪙</span>
             <span style={{ fontSize: 14, fontWeight: 700, color: '#fbbf24' }}>
-              {MOCK_INVENTORY.gold.toLocaleString()}
+              {(session?.inventory.gold ?? MOCK_INVENTORY.gold).toLocaleString()}
             </span>
           </div>
         )}
@@ -467,7 +495,7 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
                 <span style={{ fontSize: 15, color: '#94a3b8' }}>/ {char.enlightenmentLevelCap}</span>
               </div>
               <button
-                onClick={() => atCap ? setEnlightenOpen(true) : setLvlUpOpen(true)}
+                onClick={() => atCap ? openEnlighten() : openLvlUp()}
                 style={{
                   padding: '9px 15px',
                   borderRadius: 9,
@@ -649,11 +677,26 @@ export const CharacterInfoScene: React.FC<CharacterInfoSceneProps> = ({
         </div>
       )}
 
-      {lvlUpOpen && (
-        <LvlUpPopup char={char} onClose={() => setLvlUpOpen(false)} topOffset={TOP_BAR_H} />
+      {lvlUpOpen && session && (
+        <LvlUpPopup
+          char={char}
+          sessionChar={session.char}
+          sessionInventory={session.inventory}
+          onLvlUpConfirm={handleLvlUpConfirm}
+          onSwitchToEnlighten={handleSwitchToEnlighten}
+          onClose={closePopup}
+          topOffset={TOP_BAR_H}
+        />
       )}
-      {enlightenOpen && (
-        <EnlightenPopup char={char} onClose={() => setEnlightenOpen(false)} topOffset={TOP_BAR_H} />
+      {enlightenOpen && session && (
+        <EnlightenPopup
+          char={char}
+          sessionChar={session.char}
+          sessionInventory={session.inventory}
+          onEnlightenConfirm={handleEnlightenConfirm}
+          onClose={closePopup}
+          topOffset={TOP_BAR_H}
+        />
       )}
       {skillPopup.type === 'ultimate' && (
         <SkillLvPopup

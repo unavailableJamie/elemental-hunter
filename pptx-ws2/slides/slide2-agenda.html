@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #ffffff; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+  background: #ffffff;
+}
+.accent-bar { width: 100%; height: 8pt; background: #1A6FD4; flex-shrink: 0; }
+.title-row {
+  padding: 10pt 22pt 6pt; flex-shrink: 0;
+  display: flex; align-items: baseline; gap: 12pt;
+}
+.title-row h1 { font-size: 26pt; font-weight: 800; color: #1E2A38; margin: 0; }
+.title-row .tag {
+  font-size: 9pt; font-weight: 700; color: #94A3B8;
+  letter-spacing: 0.08em; text-transform: uppercase; margin: 0;
+}
+
+/* Progress bar */
+.prog-wrap { padding: 0 22pt; flex-shrink: 0; }
+.prog-bar { display: flex; height: 28pt; border-radius: 6pt; overflow: hidden; }
+.seg-g { flex: 60; background: #059669; display: flex; align-items: center; justify-content: center; }
+.seg-o { flex: 20; background: #E07B1A; display: flex; align-items: center; justify-content: center; }
+.seg-p { flex: 20; background: #7C3AED; display: flex; align-items: center; justify-content: center; }
+.seg-g p, .seg-o p, .seg-p p { font-size: 12pt; font-weight: 800; color: #fff; margin: 0; }
+
+/* Phase cards */
+.cards { flex: 1; display: flex; gap: 14pt; padding: 12pt 20pt 0; overflow: hidden; }
+.card {
+  flex: 1; border-radius: 8pt; overflow: hidden;
+  display: flex; flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+}
+.card-head { height: 38pt; display: flex; align-items: center; padding: 0 14pt; gap: 10pt; }
+.card-head .pct { font-size: 18pt; font-weight: 800; color: #fff; margin: 0; }
+.card-head .name { font-size: 13pt; font-weight: 700; color: #fff; margin: 0; }
+.card-body { flex: 1; padding: 10pt 14pt; display: flex; flex-direction: column; gap: 5pt; }
+.card-body .ci { display: flex; align-items: flex-start; gap: 6pt; }
+.card-body .ck p { font-size: 11pt; font-weight: 700; margin: 0; line-height: 1.2; }
+.card-body .cv p { font-size: 11pt; color: #1E2A38; margin: 0; line-height: 1.3; }
+.card.g .card-head { background: #059669; }
+.card.g { border: 1.5pt solid #059669; }
+.card.g .card-body { background: #ECFDF5; }
+.card.g .card-body .ck p { color: #059669; }
+.card.o .card-head { background: #E07B1A; }
+.card.o { border: 1.5pt solid #E07B1A; }
+.card.o .card-body { background: #FEF3E4; }
+.card.o .card-body .ck p { color: #E07B1A; }
+.card.p .card-head { background: #7C3AED; }
+.card.p { border: 1.5pt solid #7C3AED; }
+.card.p .card-body { background: #F5F3FF; }
+.card.p .card-body .ck p { color: #7C3AED; }
+
+.footer {
+  width: 100%; height: 16pt; background: #F1F5F9; flex-shrink: 0;
+  display: flex; align-items: center; padding: 0 18pt; box-sizing: border-box;
+  justify-content: space-between;
+}
+.footer p { font-size: 8pt; color: #94A3B8; margin: 0; }
+</style>
+</head>
+<body>
+<div class="accent-bar"></div>
+<div class="title-row">
+  <h1>3 Giai Đoạn</h1>
+  <p class="tag">Tổng quan · Agenda</p>
+</div>
+<div class="prog-wrap">
+  <div class="prog-bar">
+    <div class="seg-g"><p>Phase 1 · 60%</p></div>
+    <div class="seg-o"><p>Phase 2 · +20%</p></div>
+    <div class="seg-p"><p>Phase 3 · +20%</p></div>
+  </div>
+</div>
+<div class="cards">
+  <div class="card g">
+    <div class="card-head"><p class="pct">60%</p><p class="name">Khung ban đầu</p></div>
+    <div class="card-body">
+      <div class="ci"><div class="ck"><p>→</p></div><div class="cv"><p>List toàn bộ UI từ GDD</p></div></div>
+      <div class="ci"><div class="ck"><p>→</p></div><div class="cv"><p>Chia thành Scene, tìm ảnh ref</p></div></div>
+      <div class="ci"><div class="ck"><p>→</p></div><div class="cv"><p>Format Scene Table chuẩn</p></div></div>
+      <div class="ci"><div class="ck"><p>→</p></div><div class="cv"><p>Xác định layout ngang/dọc</p></div></div>
+    </div>
+  </div>
+  <div class="card o">
+    <div class="card-head"><p class="pct">+20%</p><p class="name">Đi sâu từng Scene</p></div>
+    <div class="card-body">
+      <div class="ci"><div class="ck"><p>→</p></div><div class="cv"><p>Ghép Figma mockup thô</p></div></div>
+      <div class="ci"><div class="ck"><p>→</p></div><div class="cv"><p>AI mô tả ảnh demo</p></div></div>
+      <div class="ci"><div class="ck"><p>→</p></div><div class="cv"><p>Xác nhận / chỉnh mô tả</p></div></div>
+      <div class="ci"><div class="ck"><p>→</p></div><div class="cv"><p>AI code theo mô tả đã duyệt</p></div></div>
+    </div>
+  </div>
+  <div class="card p">
+    <div class="card-head"><p class="pct">+20%</p><p class="name">Fine-tune bằng tay</p></div>
+    <div class="card-body">
+      <div class="ci"><div class="ck"><p>→</p></div><div class="cv"><p>Mô tả chi tiết cần chỉnh</p></div></div>
+      <div class="ci"><div class="ck"><p>→</p></div><div class="cv"><p>Request nhỏ, 1 vấn đề/lần</p></div></div>
+      <div class="ci"><div class="ck"><p>→</p></div><div class="cv"><p>Kiểm tra ngay sau mỗi lần</p></div></div>
+      <div class="ci"><div class="ck"><p>→</p></div><div class="cv"><p>Design tiến hóa dần theo ý</p></div></div>
+    </div>
+  </div>
+</div>
+<div class="footer">
+  <p>AI Prototype Workflow · Agenda</p>
+  <p>60% + 20% + 20% = 100%</p>
+</div>
+</body>
+</html>

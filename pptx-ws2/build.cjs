@@ -11,6 +11,7 @@ async function build() {
 
   const slides = [
     'slide1-title.html',
+    'slide2-agenda.html',
     'slide2-phase1.html',
     'slide3-table.html',
     'slide4-phase2.html',

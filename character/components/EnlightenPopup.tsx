@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { TIER_COLOR, MOCK_INVENTORY } from '../data/mockCharacters.ts';
-import type { CharacterData } from '../data/mockCharacters.ts';
+import { MOCK_INVENTORY } from '../data/mockCharacters.ts';
+import type { CharacterData, SessionInventory } from '../data/mockCharacters.ts';
 import {
   computeCharStats,
   ENLIGHTENMENT_COSTS,
@@ -27,21 +27,30 @@ interface EnlightenPopupProps {
   char: CharacterData;
   onClose: () => void;
   topOffset?: number;
+  sessionChar?: CharacterData;
+  sessionInventory?: SessionInventory;
+  onEnlightenConfirm?: (newChar: CharacterData, newInventory: SessionInventory) => void;
 }
 
 export const EnlightenPopup: React.FC<EnlightenPopupProps> = ({
   char,
   onClose,
   topOffset = 0,
+  sessionChar,
+  sessionInventory,
+  onEnlightenConfirm,
 }) => {
-  const nextEn   = char.enlightenment + 1;
-  const enCost   = ENLIGHTENMENT_COSTS[nextEn];
-  const newLvCap = ENLIGHTENMENT_LEVEL_CAPS[nextEn] ?? char.enlightenmentLevelCap;
-  const goldCost = computeEnlightenmentGold(nextEn);
-  const goldShort = goldCost > MOCK_INVENTORY.gold;
+  const activeChar      = sessionChar ?? char;
+  const activeInventory: SessionInventory = sessionInventory ?? { ...MOCK_INVENTORY };
 
-  const currentStats = computeCharStats(char.tier, char.charLevel);
-  const expCap       = expToNextLevel(char.charLevel);
+  const nextEn   = activeChar.enlightenment + 1;
+  const enCost   = ENLIGHTENMENT_COSTS[nextEn];
+  const newLvCap = ENLIGHTENMENT_LEVEL_CAPS[nextEn] ?? activeChar.enlightenmentLevelCap;
+  const goldCost = computeEnlightenmentGold(nextEn);
+  const goldShort = goldCost > activeInventory.gold;
+
+  const currentStats = computeCharStats(activeChar.tier, activeChar.charLevel);
+  const expCap       = expToNextLevel(activeChar.charLevel);
 
   const matSlots = enCost
     ? (Object.keys(ENLIGHTENMENT_MATERIALS) as EnMatKey[])
@@ -51,12 +60,31 @@ export const EnlightenPopup: React.FC<EnlightenPopupProps> = ({
           label:    ENLIGHTENMENT_MATERIALS[k].label,
           color:    ENLIGHTENMENT_MATERIALS[k].color,
           required: (enCost as Record<string, number>)[k],
-          owned:    MOCK_INVENTORY[k],
+          owned:    activeInventory[k],
         }))
     : [];
 
   const canAffordMats = matSlots.every(s => s.owned >= s.required);
   const canConfirm    = matSlots.length > 0 && canAffordMats && !goldShort;
+
+  const handleConfirm = () => {
+    const newChar: CharacterData = {
+      ...activeChar,
+      enlightenment: nextEn,
+      enlightenmentLevelCap: newLvCap,
+    };
+    const newInventory: SessionInventory = { ...activeInventory };
+    newInventory.gold -= goldCost;
+    if (enCost) {
+      const cost = enCost as Record<string, number | undefined>;
+      if (cost.EnMat1) newInventory.EnMat1 -= cost.EnMat1;
+      if (cost.EnMat2) newInventory.EnMat2 -= cost.EnMat2;
+      if (cost.EnMat3) newInventory.EnMat3 -= cost.EnMat3;
+      if (cost.EnMat4) newInventory.EnMat4 -= cost.EnMat4;
+      if (cost.EnMat5) newInventory.EnMat5 -= cost.EnMat5;
+    }
+    onEnlightenConfirm?.(newChar, newInventory);
+  };
 
   const stats = [
     { icon: '⚔', label: 'ATK', value: currentStats.atk, color: '#f87171' },
@@ -164,9 +192,9 @@ export const EnlightenPopup: React.FC<EnlightenPopupProps> = ({
             onMouseLeave={closeEnlightTooltip}
             onClick={toggleEnlightTooltip}
           >
-            {Array.from({ length: char.enlightenmentMax }).map((_, i) => {
-              const filled  = i < char.enlightenment;
-              const isNext  = i === char.enlightenment;
+            {Array.from({ length: activeChar.enlightenmentMax }).map((_, i) => {
+              const filled  = i < activeChar.enlightenment;
+              const isNext  = i === activeChar.enlightenment;
               return (
                 <div
                   key={i}
@@ -190,7 +218,7 @@ export const EnlightenPopup: React.FC<EnlightenPopupProps> = ({
           {/* Level row: Lv.X / [cap → newCap blinks] */}
           <div style={{ marginBottom: 14, display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 800, fontSize: 30, color: '#fff', lineHeight: 1 }}>
-              Lv. {char.charLevel}
+              Lv. {activeChar.charLevel}
             </span>
             <span style={{ fontSize: 15, color: '#94a3b8' }}>/</span>
             {/* Blinking: "oldCap → newCap" */}
@@ -198,7 +226,7 @@ export const EnlightenPopup: React.FC<EnlightenPopupProps> = ({
               fontSize: 15, fontWeight: 800, color: ENLIGHTEN_COLOR,
               animation: 'enTextBlink 1.2s ease-in-out infinite',
             }}>
-              {char.enlightenmentLevelCap} → {newLvCap}
+              {activeChar.enlightenmentLevelCap} → {newLvCap}
             </span>
           </div>
 
@@ -341,7 +369,7 @@ export const EnlightenPopup: React.FC<EnlightenPopupProps> = ({
 
             {/* Khai Sáng button */}
             <button
-              onClick={onClose}
+              onClick={handleConfirm}
               disabled={!canConfirm}
               style={{
                 width: '50%', padding: '11px 20px',

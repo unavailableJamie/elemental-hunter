@@ -9,41 +9,42 @@ body {
   display: flex; flex-direction: column;
   background: #ffffff;
 }
-.top-bar { width: 100%; height: 6pt; background: #1A6FD4; flex-shrink: 0; }
-.main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 52pt; }
-h1 { font-size: 38pt; color: #1E2A38; margin: 0 0 4pt 0; font-weight: 800; text-align: center; line-height: 1.1; }
-.subtitle { font-size: 13pt; color: #6B7A8D; text-align: center; margin: 0 0 26pt 0; font-style: italic; }
-
-/* ─── Progress visualization ─── */
-.prog-wrap { width: 100%; }
-.prog-meta-label {
-  font-size: 9pt; color: #94A3B8; font-weight: 700; letter-spacing: 0.05em;
-  text-transform: uppercase; margin-bottom: 6pt; text-align: center;
+.accent-bar { width: 100%; height: 8pt; background: #1A6FD4; flex-shrink: 0; }
+.main {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 0 80pt; gap: 0;
 }
-.prog-meta-label p { margin: 0; }
-.prog-bar { display: flex; height: 32pt; border-radius: 6pt; overflow: hidden; width: 100%; }
-.seg-green  { flex: 60; background: #059669; display: flex; align-items: center; justify-content: center; }
-.seg-orange { flex: 20; background: #E07B1A; display: flex; align-items: center; justify-content: center; }
-.seg-purple { flex: 20; background: #7C3AED; display: flex; align-items: center; justify-content: center; }
-.seg-green p, .seg-orange p, .seg-purple p { font-size: 14pt; font-weight: 800; color: #fff; margin: 0; text-align: center; }
-
-/* Milestone ticks */
-.prog-ticks { display: flex; margin-top: 5pt; align-items: flex-start; }
-.tick-wrap { display: flex; flex-direction: column; align-items: center; }
-.tw-60 { flex: 60; } .tw-20a { flex: 20; } .tw-20b { flex: 20; }
-.tick-name p { font-size: 12pt; font-weight: 700; margin: 0; text-align: center; }
-.tick-sub p  { font-size: 9pt; color: #6B7A8D; margin: 1pt 0 0 0; text-align: center; }
-.tick-range p { font-size: 9pt; font-weight: 600; margin: 2pt 0 0 0; text-align: center; }
-.tw-60 .tick-name p { color: #059669; }
-.tw-60 .tick-range p { color: #059669; }
-.tw-20a .tick-name p { color: #E07B1A; }
-.tw-20a .tick-range p { color: #E07B1A; }
-.tw-20b .tick-name p { color: #7C3AED; }
-.tw-20b .tick-range p { color: #7C3AED; }
-
-.total-label { text-align: center; margin-top: 14pt; }
-.total-label p { font-size: 12pt; color: #1E2A38; font-weight: 700; margin: 0; }
-
+.tag {
+  font-size: 9pt; font-weight: 700; color: #94A3B8;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  margin: 0 0 12pt 0;
+}
+h1 {
+  font-size: 40pt; color: #1E2A38; margin: 0; font-weight: 800;
+  text-align: center; line-height: 1.1;
+}
+.sub {
+  font-size: 15pt; color: #6B7A8D; margin: 8pt 0 0 0;
+  font-style: italic; text-align: center;
+}
+.divider {
+  width: 64pt; height: 3pt; background: #1A6FD4;
+  border-radius: 2pt; margin: 20pt 0;
+}
+.phases-row { display: flex; gap: 16pt; margin: 0; }
+.phase-chip {
+  display: flex; align-items: center; gap: 6pt;
+  padding: 5pt 12pt; border-radius: 20pt;
+}
+.phase-chip.g { background: #ECFDF5; border: 1.5pt solid #059669; }
+.phase-chip.o { background: #FEF3E4; border: 1.5pt solid #E07B1A; }
+.phase-chip.p { background: #F5F3FF; border: 1.5pt solid #7C3AED; }
+.phase-chip .pct { font-size: 13pt; font-weight: 800; margin: 0; }
+.phase-chip.g .pct { color: #059669; }
+.phase-chip.o .pct { color: #E07B1A; }
+.phase-chip.p .pct { color: #7C3AED; }
+.phase-chip .lbl { font-size: 10.5pt; color: #1E2A38; margin: 0; font-weight: 600; }
 .footer {
   width: 100%; height: 16pt; background: #F1F5F9; flex-shrink: 0;
   display: flex; align-items: center; padding: 0 18pt; box-sizing: border-box;
@@ -53,40 +54,21 @@ h1 { font-size: 38pt; color: #1E2A38; margin: 0 0 4pt 0; font-weight: 800; text-
 </style>
 </head>
 <body>
-<div class="top-bar"></div>
+<div class="accent-bar"></div>
 <div class="main">
+  <p class="tag">AI-Assisted Prototype Workflow</p>
   <h1>Quy trình làm Prototype bằng AI</h1>
-  <p class="subtitle">AI-Assisted Prototype Workflow</p>
-  <div class="prog-wrap">
-    <div class="prog-meta-label"><p>Mức hoàn thành sản phẩm (Product Completion %)</p></div>
-    <div class="prog-bar">
-      <div class="seg-green"><p>60%</p></div>
-      <div class="seg-orange"><p>+20%</p></div>
-      <div class="seg-purple"><p>+20%</p></div>
-    </div>
-    <div class="prog-ticks">
-      <div class="tick-wrap tw-60">
-        <p class="tick-name" style="margin:0;font-size:12pt;font-weight:700;color:#059669;text-align:center;">Khung ban đầu</p>
-        <p class="tick-sub" style="margin:1pt 0 0;font-size:9pt;color:#6B7A8D;text-align:center;">Xây toàn bộ khung logic</p>
-        <p class="tick-range" style="margin:2pt 0 0;font-size:9pt;font-weight:600;color:#059669;text-align:center;">0% → 60%</p>
-      </div>
-      <div class="tick-wrap tw-20a">
-        <p class="tick-name" style="margin:0;font-size:12pt;font-weight:700;color:#E07B1A;text-align:center;">Đi sâu từng Scene</p>
-        <p class="tick-sub" style="margin:1pt 0 0;font-size:9pt;color:#6B7A8D;text-align:center;">Code từng scene</p>
-        <p class="tick-range" style="margin:2pt 0 0;font-size:9pt;font-weight:600;color:#E07B1A;text-align:center;">60% → 80%</p>
-      </div>
-      <div class="tick-wrap tw-20b">
-        <p class="tick-name" style="margin:0;font-size:12pt;font-weight:700;color:#7C3AED;text-align:center;">Fine-tune</p>
-        <p class="tick-sub" style="margin:1pt 0 0;font-size:9pt;color:#6B7A8D;text-align:center;">Chỉnh chi tiết cuối</p>
-        <p class="tick-range" style="margin:2pt 0 0;font-size:9pt;font-weight:600;color:#7C3AED;text-align:center;">80% → 100%</p>
-      </div>
-    </div>
+  <p class="sub">Từ khung tổng thể đến sản phẩm hoàn chỉnh</p>
+  <div class="divider"></div>
+  <div class="phases-row">
+    <div class="phase-chip g"><p class="pct">60%</p><p class="lbl">Khung ban đầu</p></div>
+    <div class="phase-chip o"><p class="pct">+20%</p><p class="lbl">Đi sâu từng Scene</p></div>
+    <div class="phase-chip p"><p class="pct">+20%</p><p class="lbl">Fine-tune bằng tay</p></div>
   </div>
-  <div class="total-label"><p>3 giai đoạn · 60% + 20% + 20% = 100% Prototype hoàn chỉnh</p></div>
 </div>
 <div class="footer">
   <p>AI Prototype Workflow</p>
-  <p>3 Giai Đoạn · Overview</p>
+  <p>CCN2 · 2026</p>
 </div>
 </body>
 </html>

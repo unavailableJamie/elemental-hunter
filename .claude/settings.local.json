@@ -103,7 +103,8 @@
       "Bash(py -3 --version)",
       "Read(//c/Program Files//**)",
       "Read(//c/Users/CPU60223_LOCAL/**)",
-      "Read(//c/ProgramData/**)"
+      "Read(//c/ProgramData/**)",
+      "Bash(find 'd:\\\\Tamaki\\\\3. Wokrs\\\\2. Oshigoto\\\\11. Claude-PRJ\\\\1. CCN2\\\\v3' -type f \\\\\\(-name *.md -o -name *README* \\\\\\))"
     ],
     "additionalDirectories": [
       "C:\\Users\\CPU60223_LOCAL\\.claude\\skills\\doc-reviewer",
