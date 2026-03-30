@@ -257,7 +257,13 @@
   /* Affinity-colored pulse for Ultimate button — color set via inline border/box-shadow */
   @keyframes affinity-pulse {
     0%, 100% { transform: scale(1);    opacity: 1; }
-    50%       { transform: scale(1.04); opacity: 0.9; }
+    50%       { transform: scale(1.07); opacity: 0.95; }
+  }
+
+  /* Pulsing radial glow backdrop behind ult button when canActivate */
+  @keyframes ult-glow-pulse {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50%       { opacity: 1;   transform: scale(1.18); }
   }
 
   /* Chibi tooltip slide-in from right (for P1, panel appears to the left) */

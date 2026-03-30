@@ -1579,6 +1579,21 @@ const App: React.FC = () => {
 
                             return (
                                 <>
+                                    {/* Pulsing radial glow backdrop — only when canActivate */}
+                                    {canActivate && (
+                                        <div
+                                            className="absolute rounded-full pointer-events-none z-[49]"
+                                            style={{
+                                                bottom: layout.ultButton.bottom - 18,
+                                                left:   layout.ultButton.left   - 18,
+                                                width:  layout.ultButton.size   + 36,
+                                                height: layout.ultButton.size   + 36,
+                                                background: `radial-gradient(circle, ${glowCol} 0%, transparent 68%)`,
+                                                animation: 'ult-glow-pulse 1.2s ease-in-out infinite',
+                                            }}
+                                        />
+                                    )}
+
                                     {/* Round liquid-fill ultimate button */}
                                     <button
                                         onClick={() => {
@@ -1597,11 +1612,13 @@ const App: React.FC = () => {
                                             padding: 0,
                                             overflow: 'hidden',
                                             background: '#0a0520',
-                                            border: `2px solid ${isCharged ? borderCol : 'rgba(100,80,180,.4)'}`,
-                                            boxShadow: isCharged
-                                                ? `0 0 24px ${glowCol}, 0 0 48px ${glowCol}`
-                                                : '0 2px 12px rgba(0,0,0,.6)',
-                                            animation: canActivate ? 'affinity-pulse 1.5s ease-in-out infinite' : 'none',
+                                            border: `${canActivate ? 3 : 2}px solid ${isCharged ? borderCol : 'rgba(100,80,180,.4)'}`,
+                                            boxShadow: canActivate
+                                                ? `0 0 0 4px ${borderCol}55, 0 0 48px ${glowCol}, 0 0 96px ${glowCol}`
+                                                : isCharged
+                                                    ? `0 0 24px ${glowCol}, 0 0 48px ${glowCol}`
+                                                    : '0 2px 12px rgba(0,0,0,.6)',
+                                            animation: canActivate ? 'affinity-pulse 1.2s ease-in-out infinite' : 'none',
                                             transition: 'box-shadow .4s, border-color .4s',
                                             cursor: isAnimating ? 'default' : 'pointer',
                                             opacity: isAnimating ? 0.4 : 1,
