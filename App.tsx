@@ -30,7 +30,7 @@ import { TILE_POSITIONS } from './boardLayout.ts';
 import { FINAL_GOALS } from './boardSpec.ts';
 
 const ANIMATION_STEP_DELAY = 60;
-const POWER_ROLL_CYCLE = 2100;
+const POWER_ROLL_CYCLE = 2625;
 const POWER_RANGES: [number, number][] = [[2, 4], [5, 7], [7, 9], [10, 12]];
 
 interface VisualEffect {
@@ -1694,7 +1694,7 @@ const App: React.FC = () => {
                                     <div className="absolute z-50" style={{ bottom: layout.rollButton.bottom, right: layout.rollButton.right, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                                         {/* Power Roll progress bar — shown while rolling */}
                                         {isRolling && (
-                                            <div style={{ position: 'relative', width: 180, height: 28, borderRadius: 6, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,.6)' }}>
+                                            <div style={{ position: 'relative', width: 234, height: 36, borderRadius: 6, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,.6)' }}>
                                                 <div style={{ display: 'flex', height: '100%' }}>
                                                     {POWER_RANGES.map(([lo, hi], i) => {
                                                         const colors = ['#ef4444','#f97316','#eab308','#22c55e'];

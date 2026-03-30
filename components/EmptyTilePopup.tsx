@@ -513,13 +513,31 @@ export const EmptyTilePopup: React.FC<EmptyTilePopupProps> = ({
                                     Visit #{visits}
                                 </div>
                                 {maxArtifactSlots >= 1 && (
-                                    <ToolButton label="Swap"   icon={<ArrowLeftRight size={18} />} color="indigo"  unlocked={unlockedItems.SWAP}   onClick={() => unlockedItems.SWAP   && handleToolSelect('SWAP')}   />
+                                    <ToolButton
+                                        label="Swap" icon={<ArrowLeftRight size={18} />} color="indigo"
+                                        unlocked={unlockedItems.SWAP}
+                                        onClick={() => unlockedItems.SWAP && handleToolSelect('SWAP')}
+                                        effect="Swap two adjacent elements in your queue to reorder them."
+                                        unlockHint={!unlockedItems.SWAP ? `Unlocks at visit #${ARTIFACT_SWAP_THRESHOLD} (${Math.max(0, ARTIFACT_SWAP_THRESHOLD - visits)} more)` : undefined}
+                                    />
                                 )}
                                 {maxArtifactSlots >= 2 && (
-                                    <ToolButton label="Change" icon={<RefreshCw size={18} />}      color="emerald" unlocked={unlockedItems.CHANGE} onClick={() => unlockedItems.CHANGE && handleToolSelect('CHANGE')} />
+                                    <ToolButton
+                                        label="Change" icon={<RefreshCw size={18} />} color="emerald"
+                                        unlocked={unlockedItems.CHANGE}
+                                        onClick={() => unlockedItems.CHANGE && handleToolSelect('CHANGE')}
+                                        effect="Replace any element in your queue with a different element type."
+                                        unlockHint={!unlockedItems.CHANGE ? `Unlocks at visit #${ARTIFACT_CHANGE_THRESHOLD} (${Math.max(0, ARTIFACT_CHANGE_THRESHOLD - visits)} more)` : undefined}
+                                    />
                                 )}
                                 {maxArtifactSlots >= 3 && (
-                                    <ToolButton label="Charge" icon={<Zap size={18} />}             color="amber"   unlocked={unlockedItems.CHARGE} onClick={() => unlockedItems.CHARGE && handleToolSelect('CHARGE')} />
+                                    <ToolButton
+                                        label="Charge" icon={<Zap size={18} />} color="amber"
+                                        unlocked={unlockedItems.CHARGE}
+                                        onClick={() => unlockedItems.CHARGE && handleToolSelect('CHARGE')}
+                                        effect="Add a randomly drawn element to your queue."
+                                        unlockHint={!unlockedItems.CHARGE ? `Unlocks at visit #${ARTIFACT_CHARGE_THRESHOLD} (${Math.max(0, ARTIFACT_CHARGE_THRESHOLD - visits)} more)` : undefined}
+                                    />
                                 )}
                                 <button onClick={onSkip} className="px-3 py-2 text-zinc-500 hover:text-white text-[10px] font-black uppercase tracking-widest transition-colors ml-1">
                                     Skip
@@ -558,31 +576,99 @@ const COLOR_MAP: Record<string, { bg: string; text: string; border: string; bgHo
 
 interface ToolButtonProps {
     label: string; icon: React.ReactNode; color: string; unlocked: boolean; onClick: () => void;
+    effect?: string;
+    unlockHint?: string;
 }
 
-const ToolButton: React.FC<ToolButtonProps> = ({ label, icon, color, unlocked, onClick }) => {
+const ToolButton: React.FC<ToolButtonProps> = ({ label, icon, color, unlocked, onClick, effect, unlockHint }) => {
     const c = COLOR_MAP[color] ?? COLOR_MAP.indigo;
+    const [showTip, setShowTip] = useState(false);
+    const tipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const openTip  = () => setShowTip(true);
+    const closeTip = () => {
+        if (tipTimerRef.current) clearTimeout(tipTimerRef.current);
+        setShowTip(false);
+    };
+    // Touch: auto-dismiss after 2.5 s
+    const touchTip = () => {
+        setShowTip(true);
+        tipTimerRef.current = setTimeout(() => setShowTip(false), 2500);
+    };
+
     return (
-        <motion.button
-            onClick={onClick}
-            disabled={!unlocked}
-            className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all relative"
-            style={{
-                background: unlocked ? c.bg : '#18181B',
-                border: `1px solid ${unlocked ? c.border : '#27272A'}`,
-                color: unlocked ? c.text : '#52525B',
-                opacity: unlocked ? 1 : 0.55,
-                cursor: unlocked ? 'pointer' : 'not-allowed',
-                minWidth: 56,
-            }}
-            whileHover={unlocked ? { scale: 1.06, background: c.bgHover } : {}}
-            whileTap={unlocked ? { scale: 0.93 } : {}}
+        <div
+            className="relative"
+            onMouseEnter={openTip}
+            onMouseLeave={closeTip}
+            onPointerDown={(e) => { if (e.pointerType !== 'mouse') touchTip(); }}
         >
-            {icon}
-            <span className="text-[10px] font-black uppercase tracking-wider leading-none">{label}</span>
-            {!unlocked && (
-                <span className="absolute -top-1.5 -right-1.5 text-[8px] bg-zinc-700 rounded-full px-1 text-amber-400 font-black border border-amber-600/30">🔒</span>
-            )}
-        </motion.button>
+            {/* Tooltip — appears above button on hover/press */}
+            <AnimatePresence>
+                {showTip && (
+                    <motion.div
+                        className="absolute bottom-full mb-2 left-1/2 z-[400] pointer-events-none"
+                        style={{ translateX: '-50%', width: 168 }}
+                        initial={{ opacity: 0, y: 6, scale: 0.92 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 4, scale: 0.92 }}
+                        transition={{ duration: 0.14 }}
+                    >
+                        <div
+                            className="rounded-xl p-2.5 shadow-2xl text-left"
+                            style={{
+                                background: '#18181B',
+                                border: `1px solid ${c.border}55`,
+                            }}
+                        >
+                            <p className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: c.text }}>
+                                {label}
+                            </p>
+                            {effect && (
+                                <p className="text-xs text-zinc-300 leading-snug mb-2">{effect}</p>
+                            )}
+                            {unlocked ? (
+                                <div className="flex items-center gap-1">
+                                    <span className="text-[9px]">✅</span>
+                                    <span className="text-[9px] font-black text-emerald-400">Unlocked</span>
+                                </div>
+                            ) : unlockHint && (
+                                <div className="flex items-center gap-1">
+                                    <span className="text-[9px]">🔒</span>
+                                    <span className="text-[9px] font-black text-amber-400">{unlockHint}</span>
+                                </div>
+                            )}
+                        </div>
+                        {/* Arrow pointing down */}
+                        <div
+                            className="absolute top-full left-1/2 -translate-x-1/2"
+                            style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid #18181B' }}
+                        />
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <motion.button
+                onClick={onClick}
+                disabled={!unlocked}
+                className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all relative"
+                style={{
+                    background: unlocked ? c.bg : '#18181B',
+                    border: `1px solid ${unlocked ? c.border : '#27272A'}`,
+                    color: unlocked ? c.text : '#52525B',
+                    opacity: unlocked ? 1 : 0.55,
+                    cursor: unlocked ? 'pointer' : 'not-allowed',
+                    minWidth: 56,
+                }}
+                whileHover={unlocked ? { scale: 1.06, background: c.bgHover } : {}}
+                whileTap={unlocked ? { scale: 0.93 } : {}}
+            >
+                {icon}
+                <span className="text-[10px] font-black uppercase tracking-wider leading-none">{label}</span>
+                {!unlocked && (
+                    <span className="absolute -top-1.5 -right-1.5 text-[8px] bg-zinc-700 rounded-full px-1 text-amber-400 font-black border border-amber-600/30">🔒</span>
+                )}
+            </motion.button>
+        </div>
     );
 };

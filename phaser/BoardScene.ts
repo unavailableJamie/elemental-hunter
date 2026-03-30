@@ -44,6 +44,18 @@ const HUD_QUEUE_POS: Record<string, { x: number; y: number }> = {
 // Element icon order on each player's goal path (index 0→3 = Rock→Ice→Grass→Fire)
 const GOAL_PATH_ELEMENTS = [TileType.Rock, TileType.Ice, TileType.Grass, TileType.Fire];
 
+// Tiles that use a custom dark color and have no element icons (P3 + P4 goal paths)
+const DARK_TILE_IDS = new Set([10, 16, 22, 27, 30, 37, 43, 49]);
+const DARK_TILE_COLOR = 0x170E31;
+
+// P1 goal path tiles
+const P1_TILE_IDS = new Set([31, 26, 28, 33]);
+const P1_TILE_COLOR = 0x742929;
+
+// P2 goal path tiles
+const P2_TILE_IDS = new Set([25, 19, 13, 7]);
+const P2_TILE_COLOR = 0x175B2A;
+
 // Emoji for each element type rendered flat on goal path tiles
 const ELEMENT_EMOJI: Record<string, string> = {
   rock:  '🪨',
@@ -585,12 +597,11 @@ export class BoardScene extends Phaser.Scene {
       const td  = state.board[pos.y]?.[pos.x];
       if (!td) continue;
 
-      const base      = TILE_HEX[td.type] ?? 0xF3F4F6;
-      const isGoal    = FINAL_GOAL_TILE_IDS.has(tileId);
-      // HL glow is handled by the animated overlay; only goal gets a static glow here
-      const glowColor = isGoal ? 0xFCD34D : undefined;
-
-      this.drawTile(g, pos.x, pos.y, base, glowColor);
+      const base      = DARK_TILE_IDS.has(tileId) ? DARK_TILE_COLOR
+                      : P1_TILE_IDS.has(tileId)   ? P1_TILE_COLOR
+                      : P2_TILE_IDS.has(tileId)   ? P2_TILE_COLOR
+                      : (TILE_HEX[td.type] ?? 0xF3F4F6);
+      this.drawTile(g, pos.x, pos.y, base);
     }
   }
 
@@ -826,11 +837,11 @@ export class BoardScene extends Phaser.Scene {
       }
       const bg = this.tileLabelBg.get(tileId)!;
       bg.clear();
-      bg.fillStyle(fillHex, 0.9);
+      bg.fillStyle(fillHex, 0.38);
       bg.fillCircle(0, 0, BUBBLE_R);
-      bg.lineStyle(1.5, rimHex, 0.9);
+      bg.lineStyle(1.5, rimHex, 0.55);
       bg.strokeCircle(0, 0, BUBBLE_R);
-      bg.setPosition(x, labelY).setAlpha(1).setVisible(true);
+      bg.setPosition(x, labelY).setAlpha(0.75).setVisible(true);
 
       // ── Icon text (no background) ──
       if (!this.tileLabel.has(tileId)) {
@@ -944,9 +955,9 @@ export class BoardScene extends Phaser.Scene {
 
     // Temporary bubble objects (the real ones are hidden by occupied-check)
     const tempBg = this.add.graphics().setDepth(7000);
-    tempBg.fillStyle(0xB91C1C, 0.55);
+    tempBg.fillStyle(0xB91C1C, 0.38);
     tempBg.fillCircle(0, 0, 18);
-    tempBg.lineStyle(1, 0xF87171, 0.6);
+    tempBg.lineStyle(1, 0xF87171, 0.55);
     tempBg.strokeCircle(0, 0, 18);
     tempBg.setPosition(tx, ty).setAlpha(0);
 
@@ -954,7 +965,7 @@ export class BoardScene extends Phaser.Scene {
       .setOrigin(0.5, 0.5).setDepth(7001).setAlpha(0);
 
     // Phase 1: appear at tile
-    this.tweens.add({ targets: [tempBg, tempLbl], alpha: 1, duration: 200 });
+    this.tweens.add({ targets: [tempBg, tempLbl], alpha: 0.75, duration: 200 });
 
     // Phase 2: fly above horse head
     this.time.delayedCall(350, () => {
@@ -999,9 +1010,9 @@ export class BoardScene extends Phaser.Scene {
     const { x: tx, y: ty } = this.iso(pos.x, pos.y);
 
     const tempBg = this.add.graphics().setDepth(9500);
-    tempBg.fillStyle(0x2563EB, 0.55);
+    tempBg.fillStyle(0x2563EB, 0.38);
     tempBg.fillCircle(0, 0, 18);
-    tempBg.lineStyle(1, 0x60A5FA, 0.6);
+    tempBg.lineStyle(1, 0x60A5FA, 0.55);
     tempBg.strokeCircle(0, 0, 18);
     tempBg.setPosition(tx, ty).setAlpha(0);
 
@@ -1009,7 +1020,7 @@ export class BoardScene extends Phaser.Scene {
       .setOrigin(0.5, 0.5).setDepth(9501).setAlpha(0);
 
     // Phase 1: appear at tile
-    this.tweens.add({ targets: [tempBg, tempLbl], alpha: 1, duration: 200 });
+    this.tweens.add({ targets: [tempBg, tempLbl], alpha: 0.75, duration: 200 });
 
     // Phase 2: fly above horse, pause 0.5s
     this.time.delayedCall(300, () => {
@@ -1043,11 +1054,7 @@ export class BoardScene extends Phaser.Scene {
     if (!td) return;
 
     const base   = TILE_HEX[td.type] ?? 0xF3F4F6;
-    const isGoal = FINAL_GOAL_TILE_IDS.has(tileId);
-
-    let glow: number | undefined;
-    if (over)        glow = 0xFFFFFF;
-    else if (isGoal) glow = 0xFCD34D;
+    const glow = over ? 0xFFFFFF : undefined;
     this.drawTile(g, pos.x, pos.y, base, glow);
   }
 
@@ -1171,6 +1178,7 @@ export class BoardScene extends Phaser.Scene {
   private createGoalPathIcons() {
     for (const [, path] of Object.entries(GOAL_PATHS)) {
       path.forEach((tileId, idx) => {
+        if (DARK_TILE_IDS.has(tileId)) return;  // no icons on dark tiles
         const pos = TILE_POSITIONS[tileId];
         if (!pos) return;
         const element = GOAL_PATH_ELEMENTS[idx];
