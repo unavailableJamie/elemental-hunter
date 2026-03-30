@@ -248,6 +248,45 @@
   .animate-floating-damage {
     animation: floating-damage 1.5s ease-out forwards;
   }
+
+  @keyframes ultpulse {
+    0%, 100% { box-shadow: 0 0 16px rgba(124,58,237,.75), 0 0 32px rgba(124,58,237,.35); }
+    50%       { box-shadow: 0 0 28px rgba(167,139,250,1),  0 0 56px rgba(124,58,237,.65); }
+  }
+
+  /* Affinity-colored pulse for Ultimate button — color set via inline border/box-shadow */
+  @keyframes affinity-pulse {
+    0%, 100% { transform: scale(1);    opacity: 1; }
+    50%       { transform: scale(1.04); opacity: 0.9; }
+  }
+
+  /* Chibi tooltip slide-in from right (for P1, panel appears to the left) */
+  @keyframes slide-in-from-right {
+    from { opacity: 0; transform: translateX(12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  /* Chibi tooltip slide-in from left (for P2, panel appears to the right) */
+  @keyframes slide-in-from-left {
+    from { opacity: 0; transform: translateX(-12px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes chibi-float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-8px); }
+  }
+  .animate-chibi-float {
+    animation: chibi-float 2s ease-in-out infinite;
+  }
+
+  @keyframes chibi-turn-flash {
+    0%   { transform: scale(1);    filter: brightness(1); }
+    20%  { transform: scale(1.18); filter: brightness(1.8) drop-shadow(0 0 12px rgba(255,255,255,0.9)); }
+    100% { transform: scale(1);    filter: brightness(1); }
+  }
+  .animate-chibi-turn-flash {
+    animation: chibi-turn-flash 0.6s ease-out forwards;
+  }
 </style>
 <link rel="stylesheet" href="/index.css">
 </head>

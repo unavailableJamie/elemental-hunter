@@ -1,75 +1,167 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TileType } from '../types.ts';
 import { ElementIcon } from './PlayerInfo.tsx';
-import { ELEMENTAL_TILES } from '../constants.ts';
+
+// Rock → Ice → Grass → Fire, matching the goal path order
+const ELEMENT_SEQUENCE = [TileType.Rock, TileType.Ice, TileType.Grass, TileType.Fire];
+
+const ELEMENT_META: Record<string, { color: string; glow: string; label: string }> = {
+    rock:  { color: '#57534E', glow: '#A8A29E', label: 'Rock' },
+    ice:   { color: '#0369A1', glow: '#7DD3FC', label: 'Ice' },
+    grass: { color: '#15803D', glow: '#4ADE80', label: 'Grass' },
+    fire:  { color: '#B91C1C', glow: '#FCA5A5', label: 'Fire' },
+};
 
 interface GoalRewardPopupProps {
     onSelect: (element: TileType) => void;
     playerName: string;
-    elementQueue: TileType[];
 }
 
-export const GoalRewardPopup: React.FC<GoalRewardPopupProps> = ({ onSelect, playerName, elementQueue }) => {
+export const GoalRewardPopup: React.FC<GoalRewardPopupProps> = ({ onSelect, playerName }) => {
+    // After icons fly in and settle, enable interaction
+    const [landed, setLanded] = useState(false);
+    const [selected, setSelected] = useState<TileType | null>(null);
+    const [exiting, setExiting] = useState(false);
+
+    useEffect(() => {
+        // 4 icons × 120ms stagger + ~700ms spring settle
+        const t = setTimeout(() => setLanded(true), 1000);
+        return () => clearTimeout(t);
+    }, []);
+
+    const handleSelect = (element: TileType) => {
+        if (!landed || selected) return;
+        setSelected(element);
+        // Impact animation plays for ~500ms, then dismiss
+        setTimeout(() => {
+            setExiting(true);
+            setTimeout(() => onSelect(element), 350);
+        }, 500);
+    };
+
     return (
-        <AnimatePresence>
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[250] flex items-center justify-center p-4">
-                <motion.div
-                    initial={{ scale: 0.8, opacity: 0, y: 40 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    className="bg-zinc-900 border-2 border-yellow-500/50 w-full max-w-md rounded-[2.5rem] shadow-[0_0_100px_rgba(234,179,8,0.3)] overflow-hidden flex flex-col p-8 text-center"
-                >
-                    <div className="mb-6">
-                        <div className="w-20 h-20 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-[0_0_30px_rgba(234,179,8,0.5)] animate-bounce">
-                            <svg viewBox="0 0 24 24" className="w-12 h-12 fill-zinc-900">
-                                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                            </svg>
-                        </div>
-                        <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none mb-2">Goal Reached!</h2>
-                        <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest">
-                            {playerName}, choose your elemental reward
-                        </p>
-                    </div>
+        <div className="fixed inset-0 z-[250] pointer-events-none overflow-hidden">
+            {/* Bottom gradient backdrop — only the lower half */}
+            <motion.div
+                className="absolute bottom-0 left-0 right-0"
+                style={{
+                    height: '58%',
+                    background: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.65) 30%, rgba(0,0,0,0.90) 70%)',
+                }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: exiting ? 0 : 1 }}
+                transition={{ duration: 0.4 }}
+            />
 
-                    {/* Current Queue Display */}
-                    <div className="mb-6 space-y-2">
-                        <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Your Current Queue</h3>
-                        <div className="flex justify-center gap-2 bg-black/20 p-3 rounded-2xl border border-white/5">
-                            {elementQueue.length > 0 ? (
-                                elementQueue.map((type, i) => (
-                                    <div key={i} className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-md">
-                                        <ElementIcon type={type} sizeOverride="w-5 h-5" />
-                                    </div>
-                                ))
-                            ) : (
-                                <span className="text-[10px] text-zinc-600 uppercase font-black tracking-widest">Empty</span>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-8">
-                        {ELEMENTAL_TILES.map((type) => (
-                            <button
-                                key={type}
-                                onClick={() => onSelect(type)}
-                                className="group relative bg-zinc-800 hover:bg-zinc-700 border border-white/5 hover:border-yellow-500/50 p-6 rounded-3xl transition-all hover:scale-105 active:scale-95 flex flex-col items-center gap-3"
-                            >
-                                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-yellow-500/20 transition-all">
-                                    <ElementIcon type={type} sizeOverride="w-10 h-10" />
-                                </div>
-                                <span className="text-xs font-black uppercase tracking-widest text-zinc-400 group-hover:text-white transition-colors">
-                                    {type}
+            {/* Content anchored to bottom-center of screen */}
+            <AnimatePresence>
+                {!exiting && (
+                    <motion.div
+                        className="absolute"
+                        style={{ bottom: '7%', left: '50%', transform: 'translateX(-50%)', width: 'max-content' }}
+                        exit={{ opacity: 0, y: 40, transition: { duration: 0.3, ease: 'easeIn' } }}
+                    >
+                        {/* Title — fades in after icons land */}
+                        <motion.div
+                            className="text-center mb-7"
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: landed && !selected ? 1 : 0, y: landed ? 0 : 12 }}
+                            transition={{ duration: 0.35 }}
+                        >
+                            <div className="flex items-center justify-center gap-2 mb-1">
+                                <span className="text-yellow-400 text-base">★</span>
+                                <span className="text-white font-black text-base uppercase tracking-widest drop-shadow-[0_2px_8px_rgba(252,211,77,0.6)]">
+                                    {playerName}
                                 </span>
-                            </button>
-                        ))}
-                    </div>
+                                <span className="text-yellow-400 text-base">★</span>
+                            </div>
+                            <p className="text-zinc-400 text-[11px] font-bold uppercase tracking-[0.28em]">
+                                Choose elemental reward
+                            </p>
+                        </motion.div>
 
-                    <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em]">
-                        Reward will be added to your element queue
-                    </p>
-                </motion.div>
-            </div>
-        </AnimatePresence>
+                        {/* Icons row — fly in from above, zoom into position */}
+                        <div className="flex gap-6 justify-center items-end">
+                            {ELEMENT_SEQUENCE.map((element, i) => {
+                                const meta      = ELEMENT_META[element];
+                                const isChosen  = selected === element;
+                                const isDimmed  = selected !== null && !isChosen;
+
+                                return (
+                                    <motion.button
+                                        key={element}
+                                        className="flex flex-col items-center gap-3 outline-none select-none"
+                                        style={{ pointerEvents: landed && !selected ? 'auto' : 'none' }}
+                                        // ── Entry: fly down from board-tile area (~y -420 = top quarter) ──
+                                        initial={{ y: -420, scale: 0.25, opacity: 0 }}
+                                        animate={{
+                                            y: isChosen ? -28 : 0,
+                                            scale: isChosen ? 1.5 : isDimmed ? 0.62 : 1,
+                                            opacity: isDimmed ? 0.14 : 1,
+                                        }}
+                                        transition={
+                                            // Before landing: staggered spring entry
+                                            !landed
+                                                ? {
+                                                    y:       { type: 'spring', delay: i * 0.12, stiffness: 170, damping: 19 },
+                                                    scale:   { type: 'spring', delay: i * 0.12, stiffness: 170, damping: 19 },
+                                                    opacity: { delay: i * 0.12, duration: 0.14 },
+                                                }
+                                                // After landing: snappy spring for selection response
+                                                : {
+                                                    y:       { type: 'spring', stiffness: 520, damping: 28 },
+                                                    scale:   { type: 'spring', stiffness: 520, damping: 28 },
+                                                    opacity: { duration: 0.18 },
+                                                }
+                                        }
+                                        whileHover={landed && !selected ? { y: -10, scale: 1.1 } : undefined}
+                                        onClick={() => handleSelect(element)}
+                                    >
+                                        {/* Icon card */}
+                                        <div
+                                            className="w-24 h-24 rounded-[1.5rem] flex items-center justify-center relative overflow-hidden"
+                                            style={{
+                                                background: `radial-gradient(circle at 35% 30%, ${meta.glow}70, ${meta.color})`,
+                                                border: `2px solid ${meta.glow}50`,
+                                                boxShadow: isChosen
+                                                    ? `0 0 0 3px ${meta.glow}, 0 0 32px ${meta.glow}90, 0 0 70px ${meta.color}60`
+                                                    : `0 6px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.15)`,
+                                                transition: 'box-shadow 0.15s ease',
+                                            }}
+                                        >
+                                            {/* Impact white flash */}
+                                            <AnimatePresence>
+                                                {isChosen && (
+                                                    <motion.div
+                                                        className="absolute inset-0 bg-white rounded-[1.5rem]"
+                                                        initial={{ opacity: 0.95 }}
+                                                        animate={{ opacity: 0 }}
+                                                        transition={{ duration: 0.5, ease: 'easeOut' }}
+                                                    />
+                                                )}
+                                            </AnimatePresence>
+
+                                            <ElementIcon type={element} sizeOverride="w-14 h-14" />
+                                        </div>
+
+                                        {/* Label */}
+                                        <motion.span
+                                            className="text-[11px] font-black uppercase tracking-widest"
+                                            style={{ color: meta.glow }}
+                                            animate={{ opacity: isDimmed ? 0 : 1 }}
+                                            transition={{ duration: 0.15 }}
+                                        >
+                                            {meta.label}
+                                        </motion.span>
+                                    </motion.button>
+                                );
+                            })}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
     );
 };

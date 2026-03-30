@@ -14,9 +14,8 @@ import {
     GOAL_PATHS,
     ARM_PATHS,
     BRANCH_RULES,
-    TILE_ELEMENTS,
-    ElementType
 } from './boardSpec.ts';
+import { TILE_TYPE_MAP } from './tileTypeMap.ts';
 import { TILE_POSITIONS } from './boardLayout.ts';
 import { ULTIMATES, CHARACTERS } from './config/characters.ts';
 import { LEVEL_CONFIGS, DEFAULT_LEVEL, GameLevel } from './config/levels.ts';
@@ -31,7 +30,11 @@ export const DEFAULT_PLAYER_HP = 1000;
 export const DEFAULT_MAX_ELEMENT_QUEUE = 8;
 
 export const ELEMENTAL_TILES = [TileType.Fire, TileType.Ice, TileType.Grass, TileType.Rock];
-export const EMPTY_TILE_IDS = [12, 21, 3, 17, 24, 53, 40, 35, 56, 42, 20, 2];
+const _startIds  = new Set(Object.values(START_TILES));
+const _goalIds   = new Set(Object.values(GOAL_PATHS).flat());
+export const EMPTY_TILE_IDS = Object.entries(TILE_TYPE_MAP)
+    .filter(([id, t]) => t === 'normal' && !_startIds.has(parseInt(id)) && !_goalIds.has(parseInt(id)))
+    .map(([id]) => parseInt(id));
 
 // Added horse token assets (Placeholder base64)
 export const PLAYER1_TOKEN_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
@@ -55,11 +58,11 @@ export const PLAYER_COLORS: Record<PlayerID, { bg: string, token: string }> = {
     'Player4': { bg: 'bg-yellow-600', token: '#FBBF24' },
 };
 
-const ELEMENT_MAP: Record<ElementType, TileType> = {
-    [ElementType.Fire]: TileType.Fire,
-    [ElementType.WaterIce]: TileType.Ice,
-    [ElementType.GrassWood]: TileType.Grass,
-    [ElementType.Earth]: TileType.Rock,
+const LABEL_TO_TILE_TYPE: Record<string, TileType> = {
+    fire:      TileType.Fire,
+    waterice:  TileType.Ice,
+    grasswood: TileType.Grass,
+    earth:     TileType.Rock,
 };
 
 
@@ -105,9 +108,8 @@ export const generateDefaultGameState = (
 
     Object.entries(TILE_POSITIONS).forEach(([idStr, pos]) => {
         const id = parseInt(idStr);
-        const el = TILE_ELEMENTS[id];
-        let type = TileType.Normal;
-        if (el) type = ELEMENT_MAP[el];
+        const label = TILE_TYPE_MAP[id];
+        let type: TileType = LABEL_TO_TILE_TYPE[label ?? ''] ?? TileType.Normal;
         if (Object.values(START_TILES).includes(id)) {
             type = TileType.SafeZone;
         }
@@ -132,44 +134,44 @@ export const generateDefaultGameState = (
         'Player1': {
             id: 'Player1', name: 'Red Player', color: 'bg-red-600', tokenColor: '#F87171', mana: 0, manaFeedbackQueue: [], hp: playerHP, elementAffinity: affinities[0],
             tokens: [
-              { id: 1, playerId: 'Player1', tileId: 51, atk: 0, frozenRounds: 0, justFrozen: false },
-              { id: 2, playerId: 'Player1', tileId: 50, atk: 0, frozenRounds: 0, justFrozen: false },
-              { id: 3, playerId: 'Player1', tileId: 40, atk: 0, frozenRounds: 0, justFrozen: false },
+              { id: 1, playerId: 'Player1', tileId: ARM_PATHS.Player1[0], atk: 0, frozenRounds: 0, justFrozen: false },
+              { id: 2, playerId: 'Player1', tileId: ARM_PATHS.Player1[1], atk: 0, frozenRounds: 0, justFrozen: false },
+              { id: 3, playerId: 'Player1', tileId: ARM_PATHS.Player1[2], atk: 0, frozenRounds: 0, justFrozen: false },
             ],
             safeZoneTileId: START_TILES.Player1, entryTileId: START_TILES.Player1, armId: 3, elementQueue: [affinities[0]],
             comboCount: 0,
             comboTier: 0,
             tileGainMultiplier: 1,
-            manaCap: ULTIMATES['extraRoll'].cost,
+            manaCap: CHARACTERS['char1'].ultimateCost.lv1,
             emptyTileVisits: 0,
             kickCount: 0, finishedHorseCount: 0,
             doubleRollCooldown: 0,
             config: {
               maxElementQueue: DEFAULT_MAX_ELEMENT_QUEUE,
               ultimateType: 'extraRoll',
-              ultimateCost: 50,
+              ultimateCost: CHARACTERS['char1'].ultimateCost.lv1,
               characterId: 'char1'
             }
         },
         'Player2': {
             id: 'Player2', name: 'Green Player', color: 'bg-green-600', tokenColor: '#4ADE80', mana: 0, manaFeedbackQueue: [], hp: playerHP, elementAffinity: affinities[1],
             tokens: [
-              { id: 4, playerId: 'Player2', tileId: 0, atk: 0, frozenRounds: 0, justFrozen: false },
-              { id: 5, playerId: 'Player2', tileId: 6, atk: 0, frozenRounds: 0, justFrozen: false },
-              { id: 6, playerId: 'Player2', tileId: 12, atk: 0, frozenRounds: 0, justFrozen: false },
+              { id: 4, playerId: 'Player2', tileId: ARM_PATHS.Player2[0], atk: 0, frozenRounds: 0, justFrozen: false },
+              { id: 5, playerId: 'Player2', tileId: ARM_PATHS.Player2[1], atk: 0, frozenRounds: 0, justFrozen: false },
+              { id: 6, playerId: 'Player2', tileId: ARM_PATHS.Player2[2], atk: 0, frozenRounds: 0, justFrozen: false },
             ],
             safeZoneTileId: START_TILES.Player2, entryTileId: START_TILES.Player2, armId: 1, elementQueue: [affinities[1]],
             comboCount: 0,
             comboTier: 0,
             tileGainMultiplier: 1,
-            manaCap: ULTIMATES['extraRoll'].cost,
+            manaCap: CHARACTERS['char1'].ultimateCost.lv1,
             emptyTileVisits: 0,
             kickCount: 0, finishedHorseCount: 0,
             doubleRollCooldown: 0,
             config: {
               maxElementQueue: DEFAULT_MAX_ELEMENT_QUEUE,
               ultimateType: 'extraRoll',
-              ultimateCost: 50,
+              ultimateCost: CHARACTERS['char1'].ultimateCost.lv1,
               characterId: 'char1'
             }
         },
@@ -179,14 +181,14 @@ export const generateDefaultGameState = (
             comboCount: 0,
             comboTier: 0,
             tileGainMultiplier: 1,
-            manaCap: ULTIMATES['extraRoll'].cost,
+            manaCap: CHARACTERS['char1'].ultimateCost.lv1,
             emptyTileVisits: 0,
             kickCount: 0, finishedHorseCount: 0,
             doubleRollCooldown: 0,
             config: {
               maxElementQueue: DEFAULT_MAX_ELEMENT_QUEUE,
               ultimateType: 'extraRoll',
-              ultimateCost: 50,
+              ultimateCost: CHARACTERS['char1'].ultimateCost.lv1,
               characterId: 'char1'
             }
         },
@@ -196,14 +198,14 @@ export const generateDefaultGameState = (
             comboCount: 0,
             comboTier: 0,
             tileGainMultiplier: 1,
-            manaCap: ULTIMATES['extraRoll'].cost,
+            manaCap: CHARACTERS['char1'].ultimateCost.lv1,
             emptyTileVisits: 0,
             kickCount: 0, finishedHorseCount: 0,
             doubleRollCooldown: 0,
             config: {
               maxElementQueue: DEFAULT_MAX_ELEMENT_QUEUE,
               ultimateType: 'extraRoll',
-              ultimateCost: 50,
+              ultimateCost: CHARACTERS['char1'].ultimateCost.lv1,
               characterId: 'char1'
             }
         }

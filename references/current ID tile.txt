@@ -1,0 +1,41 @@
+ID | Tile | 
+1 | Safe zone P1 | 51
+2 | Ice | 50
+3 | Tools | 40
+4 | Rock | 32
+5 | Grass | 59
+6 | Fire | 35
+7 | Ice | 41
+8 | Teleport | 47
+9 | Rock | 56
+10 | Tools | 55
+11 | Safe zone | 54
+12 | Grass | 48
+13 | Fire | 42
+14 | Ice | 36
+15 | Rock | 58
+16 | Grass | 20
+17 | Tools | 14
+18 | Fire | 8
+19 | Ice | 2
+20 | Rock | 1
+21 | Safe zone P2 | 0
+22 | Grass | 6
+23 | Tools | 12
+24 | Fire | 18
+25 | Ice | 57
+26 | Rock | 21
+27 | Grass | 15
+28 | Teleport | 9
+29 | Fire | 3
+30 | Tools | 4
+31 | Safe zone | 5
+32 | Ice | 11
+33 | Rock | 17
+34 | Grass | 23
+35 | Fire | 60
+36 | Ice | 24
+37 | Tools | 34
+38 | Rock | 46
+39 | Grass | 53
+40 | Fire | 52

@@ -7,7 +7,7 @@
 import type { GameState, PlayerState } from '@/types.ts';
 import { TileType } from '@/types.ts';
 import { generateDefaultGameState } from '@/constants.ts';
-import { ULTIMATES } from '@/config/characters.ts';
+import { ULTIMATES, CHARACTERS } from '@/config/characters.ts';
 import {
   TUT_PLAYER_HP,
   TUT_MAX_ROUNDS,
@@ -37,7 +37,7 @@ export const createTutorialGameState = (): GameState => {
     emptyTileVisits:  TUT_EMPTY_TILE_VISITS_PREUNLOCK, // Pre-unlocked: cả 3 artifacts
     kickCount:        0,
     finishedHorseCount: 0,
-    manaCap:          ULTIMATES['extraRoll'].cost,
+    manaCap:          CHARACTERS['char1'].ultimateCost.lv1,
     config: {
       maxElementQueue: 8,
       ultimateType:   'extraRoll',
@@ -59,7 +59,7 @@ export const createTutorialGameState = (): GameState => {
     emptyTileVisits:  TUT_EMPTY_TILE_VISITS_PREUNLOCK,
     kickCount:        0,
     finishedHorseCount: 0,
-    manaCap:          ULTIMATES['extraRoll'].cost,
+    manaCap:          CHARACTERS['char1'].ultimateCost.lv1,
     config: {
       maxElementQueue: 8,
       ultimateType:   'extraRoll',

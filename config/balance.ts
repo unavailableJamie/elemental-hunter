@@ -31,9 +31,6 @@ export const COMBO_T1_ATK_BONUS = 150;
 // Tier 3: multiplier applied to all tokens' current ATK (milestone: 3rd combo).
 export const COMBO_T3_ATK_MULTIPLIER = 1.5;
 
-// --- ULTIMATE COSTS (Mana) ---
-export const ULTIMATE_COST_EXTRA_ROLL = 50;
-export const ULTIMATE_COST_TELEPORT   = 50;
 
 // --- POWER ROLL ACCURACY ---
 // % chance a Power Roll succeeds (used in App.tsx accuracyRate).

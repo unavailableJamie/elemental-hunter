@@ -3,8 +3,6 @@ import { GameState, PlayerID } from '../types.ts';
 import {
   COMBO_T1_ATK_BONUS,
   COMBO_T3_ATK_MULTIPLIER,
-  ULTIMATE_COST_EXTRA_ROLL,
-  ULTIMATE_COST_TELEPORT,
 } from './balance.ts';
 
 export interface ComboRewardContext {
@@ -17,7 +15,6 @@ export type ComboRewardEffect = (ctx: ComboRewardContext) => void;
 export interface UltimateDefinition {
     name: string;
     description: string;
-    cost: number;
     activate: (state: GameState, playerId: PlayerID) => GameState;
 }
 
@@ -25,7 +22,6 @@ export const ULTIMATES: Record<string, UltimateDefinition> = {
     extraRoll: {
         name: 'Extra Roll',
         description: 'Gain +1 additional dice roll immediately.',
-        cost: ULTIMATE_COST_EXTRA_ROLL,
         activate: (state) => {
             const newState = { ...state };
             newState.ultimateExtraRolls += 1;
@@ -35,7 +31,6 @@ export const ULTIMATES: Record<string, UltimateDefinition> = {
     teleport: {
         name: 'Quantum Leap',
         description: 'Teleport any of your tokens to any empty tile.',
-        cost: ULTIMATE_COST_TELEPORT,
         activate: (state) => {
             const newState = { ...state };
             // Phase change is handled in App.tsx or here if we move logic
@@ -55,6 +50,8 @@ export interface CharacterDefinition {
     mag: number;
     /** HP stat: player's starting HP when using this character */
     hp: number;
+    /** Ultimate MAG cost per level. lv1 = default; lv2 = after Dup upgrade (Ulti lvUP) */
+    ultimateCost: { lv1: number; lv2: number };
     comboRewards: {
         tier1: { title: string; description: string; effect: ComboRewardEffect };
         tier2: { title: string; description: string; effect: ComboRewardEffect };
@@ -71,6 +68,7 @@ export const CHARACTERS: Record<string, CharacterDefinition> = {
         atk: 30,  // ATK gained per Affinity tile landing
         mag: 10,  // MAG gained per non-Affinity tile landing
         hp: 1000, // Player starting HP
+        ultimateCost: { lv1: 50, lv2: 50 }, // GDD §7.3: Extra Roll Lv1=50, Lv2=50
         comboRewards: {
             tier1: {
                 title: 'Power Surge',

@@ -7,7 +7,7 @@ interface GameLogProps {
 
 export const GameLog: React.FC<GameLogProps> = ({ logs }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
-    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(true);
 
     useEffect(() => {
         if (scrollRef.current && !isCollapsed) {

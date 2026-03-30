@@ -1,15 +1,18 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { CharacterSystemApp } from './character/CharacterSystemApp.tsx';
 import { LobbyScene } from './character/scenes/LobbyScene.tsx';
 import { TutorialFlow } from './tutorial/TutorialFlow.tsx';
-import { Board } from './components/Board.tsx';
+import { PhaserGame } from './phaser/PhaserGame.tsx';
 import { EditTileModal } from './components/EditTileModal.tsx';
 import { AddTokenModal } from './components/AddTokenModal.tsx';
 import { TestingDashboard } from './components/TestingDashboard.tsx';
 import { PlayerInfo } from './components/PlayerInfo.tsx';
 import { GameLog } from './components/GameLog.tsx';
-import { TrophyIcon } from './components/Icons.tsx';
+import { TrophyIcon, DiceIcon, AtkPip } from './components/Icons.tsx';
+import { ElementIcon } from './components/PlayerInfo.tsx';
+import { Dice } from './components/Dice.tsx';
 import { LevelSelect } from './components/LevelSelect.tsx';
 import type { GameState, PlayerID, TokenState, TileData, MapData, Connection, GameLevel } from './types.ts';
 import { TileType } from './types.ts';
@@ -17,6 +20,8 @@ import {  generateDefaultGameState, TILE_SIZE } from './constants.ts';
 import { findPath, getStepsToGoal } from './utils/pathfinding.ts';
 import { resolveMove, endTurn, addLog, hasAnyLegalMove, processCombos, awardMana } from './utils/gameLogic.ts';
 import { ULTIMATES, CHARACTERS } from './config/characters.ts';
+import { DEFAULT_LAYOUT, type LayoutConfig } from './layoutConfig.ts';
+import { LEVEL_CONFIGS } from './config/levels.ts';
 import { DOUBLE_ROLL_COOLDOWN_ROUNDS, MAX_CONSECUTIVE_ROLLS } from './config/balance.ts';
 import { EmptyTilePopup } from './components/EmptyTilePopup.tsx';
 import { GoalRewardPopup } from './components/GoalRewardPopup.tsx';
@@ -25,6 +30,8 @@ import { TILE_POSITIONS } from './boardLayout.ts';
 import { FINAL_GOALS } from './boardSpec.ts';
 
 const ANIMATION_STEP_DELAY = 60;
+const POWER_ROLL_CYCLE = 2100;
+const POWER_RANGES: [number, number][] = [[2, 4], [5, 7], [7, 9], [10, 12]];
 
 interface VisualEffect {
     id: number;
@@ -173,6 +180,9 @@ const App: React.FC = () => {
     
     // Ultimate Activation Feedback State
     const [ultimateActivationName, setUltimateActivationName] = useState<string | null>(null);
+    const [chibiTooltip, setChibiTooltip] = useState<'Player1' | 'Player2' | null>(null);
+    const [showUltTooltip, setShowUltTooltip] = useState(false);
+    const [layout, setLayout] = useState<LayoutConfig>(DEFAULT_LAYOUT);
     
     // UI enhancements state
     const [visualEffects, setVisualEffects] = useState<VisualEffect[]>([]);
@@ -180,11 +190,108 @@ const App: React.FC = () => {
     const [animateRound, setAnimateRound] = useState(false);
     const prevRoundRef = useRef(gameState.currentRound);
     const prevStateRef = useRef<GameState>(gameState);
+
+    // Chibi turn-flash animation
+    const [newTurnFlash, setNewTurnFlash] = useState<string | null>(null);
+    // No-moves banner (auto-end-turn after 2s)
+    const [noMovesBannerVisible, setNoMovesBannerVisible] = useState(false);
+    // MAG feedback near ult button
+    const [magFeedbacks, setMagFeedbacks] = useState<Array<{ id: number; amount: number }>>([]);
+    // ATK / MAG Phaser scene animation events
+    const [atkAbsorbEvent, setAtkAbsorbEvent] = useState<{ tileId: number; tokenId: number; amount: number; eid: number } | undefined>();
+    const [magAbsorbEvent, setMagAbsorbEvent] = useState<{ tileId: number; tokenId: number; eid: number } | undefined>();
+    // Element added to queue → swirling light fly-to HUD
+    const [elementAddedEvent, setElementAddedEvent] = useState<{ tileId: number; tokenId: number; element: string; playerId: string; eid: number } | undefined>();
+    // Goal reward animation coordination
+    const [isGoalAnimating, setIsGoalAnimating] = useState(false);
+    const [goalReachedEvent, setGoalReachedEvent] = useState<{ playerId: string; eid: number } | undefined>();
+    const [goalElementChosenEvent, setGoalElementChosenEvent] = useState<{ playerId: string; element: string; tokenId: number; eid: number } | undefined>();
     
     
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const animationTimeoutRef = useRef<number | null>(null);
+
+    // ── Goal reward: detect phase entry, fire glow sequence ──────────────
+    const prevGoalPhaseRef = useRef<string>('');
+    useEffect(() => {
+        if (gameState.phase === 'GOAL_REWARD_SELECTION' && prevGoalPhaseRef.current !== 'GOAL_REWARD_SELECTION') {
+            setIsGoalAnimating(true);
+            setGoalReachedEvent({ playerId: gameState.currentPlayerId, eid: Date.now() });
+        }
+        prevGoalPhaseRef.current = gameState.phase;
+    }, [gameState.phase, gameState.currentPlayerId]);
+
+    const handleGoalAnimationDone = useCallback(() => {
+        setIsGoalAnimating(false);
+    }, []);
+
+    // ── Chibi turn-flash ──────────────────────────────────────────────────
+    useEffect(() => {
+        setNewTurnFlash(gameState.currentPlayerId);
+        const t = setTimeout(() => setNewTurnFlash(null), 700);
+        return () => clearTimeout(t);
+    }, [gameState.currentPlayerId]);
+
+    // ── Tooltip auto-close 5s ─────────────────────────────────────────────
+    useEffect(() => {
+        if (!chibiTooltip) return;
+        const t = setTimeout(() => setChibiTooltip(null), 5000);
+        return () => clearTimeout(t);
+    }, [chibiTooltip]);
+
+    // ── Mana feedback queue → near ult button (delayed to sync with Phaser bubble fly) ──
+    useEffect(() => {
+        const queue = gameState.players[gameState.currentPlayerId].manaFeedbackQueue;
+        if (queue.length === 0) return;
+        const newFbs = queue.map(fb => ({ id: fb.id, amount: fb.amount }));
+        handleClearManaFeedback(gameState.currentPlayerId);
+        // Delay display until the MAG bubble finishes flying to the ult button (~1600ms)
+        const showTimer = setTimeout(() => {
+            setMagFeedbacks(prev => [...prev, ...newFbs]);
+            newFbs.forEach(fb => {
+                setTimeout(() => setMagFeedbacks(curr => curr.filter(f => f.id !== fb.id)), 2000);
+            });
+        }, 1600);
+        return () => clearTimeout(showTimer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [gameState.players.Player1.manaFeedbackQueue.length, gameState.players.Player2.manaFeedbackQueue.length]);
+
+    // ── Power Roll state (lifted from PlayerInfo) ──────────────────────────
+    const [isRolling, setIsRolling] = useState(false);
+    const [rollProgress, setRollProgress] = useState(0);
+    const rollStartTimeRef = useRef<number | null>(null);
+    const rollRafRef = useRef<number | null>(null);
+
+    const tickRollProgress = () => {
+        if (rollStartTimeRef.current !== null) {
+            const elapsed = Date.now() - rollStartTimeRef.current;
+            const t = (elapsed % POWER_ROLL_CYCLE) / POWER_ROLL_CYCLE;
+            setRollProgress(1 - Math.abs(2 * t - 1));
+            rollRafRef.current = requestAnimationFrame(tickRollProgress);
+        }
+    };
+
+    const handleToggleRoll = () => {
+        if (gameState.phase !== 'SELECT_DICE') return;
+        if (!isRolling) {
+            setIsRolling(true);
+            rollStartTimeRef.current = Date.now();
+            rollRafRef.current = requestAnimationFrame(tickRollProgress);
+        } else {
+            if (rollRafRef.current) cancelAnimationFrame(rollRafRef.current);
+            const finalProgress = rollProgress;
+            setIsRolling(false);
+            rollStartTimeRef.current = null;
+            setRollProgress(0);
+            const rangeIdx = Math.min(Math.floor(finalProgress * POWER_RANGES.length), POWER_RANGES.length - 1);
+            handleRollDice(2, POWER_RANGES[rangeIdx]);
+        }
+    };
+
+    useEffect(() => {
+        return () => { if (rollRafRef.current) cancelAnimationFrame(rollRafRef.current); };
+    }, []);
 
     const hasLegalMoves = useMemo(() => {
         if (gameState.phase !== 'MOVE') return true;
@@ -237,15 +344,30 @@ const App: React.FC = () => {
                     const prevToken = pPrev.tokens.find(t => t.id === movedTokenId);
                     if (currToken && prevToken && currToken.atk > prevToken.atk) {
                         const gained = currToken.atk - prevToken.atk;
-                        const newEffect: VisualEffect = {
-                            id: nextEffectIdRef.current++,
-                            type: 'atk',
-                            x: pixelX,
-                            y: pixelY,
-                            text: `+${gained} ATK`
-                        };
-                        setVisualEffects(prev => [...prev, newEffect]);
-                        setTimeout(() => setVisualEffects(curr => curr.filter(e => e.id !== newEffect.id)), 1500);
+                        // Trigger Phaser bubble absorption animation
+                        setAtkAbsorbEvent({ tileId: finalTileId, tokenId: movedTokenId, amount: gained, eid: nextEffectIdRef.current++ });
+                    }
+
+                    // MAG gain check
+                    if (pCurr.mana > pPrev.mana) {
+                        const finalTile = gameState.board.flat().find(td => td?.id === finalTileId);
+                        const ELEMENT_TYPES = new Set([TileType.Fire, TileType.Ice, TileType.Grass, TileType.Rock]);
+                        const isMagTile = finalTile && ELEMENT_TYPES.has(finalTile.type) && finalTile.type !== pCurr.elementAffinity;
+                        if (isMagTile) {
+                            setMagAbsorbEvent({ tileId: finalTileId, tokenId: movedTokenId, eid: nextEffectIdRef.current++ });
+                        }
+                    }
+
+                    // Element queue gain check — swirling light fly-to HUD
+                    if (pCurr.elementQueue.length > pPrev.elementQueue.length) {
+                        const addedElement = pCurr.elementQueue[pCurr.elementQueue.length - 1];
+                        setElementAddedEvent({
+                            tileId: finalTileId,
+                            tokenId: movedTokenId,
+                            element: addedElement,
+                            playerId: pCurr.id,
+                            eid: nextEffectIdRef.current++,
+                        });
                     }
                 }
             }
@@ -410,9 +532,15 @@ const App: React.FC = () => {
             );
 
             if (movableTokens.length === 0) {
-                const finalState = endTurn({ ...tempState, diceCount: count, dice: newDice, hasRolledDoubles: isDoubles });
-                finalState.logs = addLog(finalState, `No legal moves for ${currentPlayer.name}. Turn passed.`);
-                return finalState;
+                // Go to MOVE phase with no selection — no-moves banner will auto-end turn after 2s
+                return {
+                    ...tempState,
+                    diceCount: count,
+                    dice: newDice,
+                    hasRolledDoubles: isDoubles,
+                    phase: 'MOVE',
+                    selectedTokenId: null,
+                };
             }
             
             const opponentId = currentPlayerId === 'Player1' ? 'Player2' : 'Player1';
@@ -507,6 +635,43 @@ const App: React.FC = () => {
         setEditingTile(null);
     };
 
+    const handleExportTiles = () => {
+        const tiles: { id: number; type: string }[] = [];
+        for (const row of gameState.board) {
+            for (const tile of row) {
+                if (tile) tiles.push({ id: tile.id, type: tile.type });
+            }
+        }
+        tiles.sort((a, b) => a.id - b.id);
+        const blob = new Blob([JSON.stringify(tiles, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'tile-layout.json'; a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const tileImportRef = useRef<HTMLInputElement>(null);
+
+    const handleImportTiles = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const imported: { id: number; type: string }[] = JSON.parse(e.target?.result as string);
+                const typeMap = new Map(imported.map(t => [t.id, t.type as TileType]));
+                setGameState(prev => ({
+                    ...prev,
+                    board: prev.board.map(row =>
+                        row.map(cell => cell && typeMap.has(cell.id) ? { ...cell, type: typeMap.get(cell.id)! } : cell)
+                    ),
+                }));
+            } catch { alert('Invalid tile JSON'); }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    };
+
     const handleImportMap = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -548,6 +713,118 @@ const App: React.FC = () => {
         });
     }, []);
 
+    // ── Phaser board callbacks ────────────────────────────────────────────
+    const handlePhaserTileClick = useCallback((tileId: number) => {
+        if (gameState.phase === 'SELECT_TELEPORT_DEST') {
+            handleTeleportDestinationSelect(tileId);
+            return;
+        }
+        if (gameState.phase !== 'MOVE') return;
+        // Find which current-player token can reach this tile
+        const player = gameState.players[gameState.currentPlayerId];
+        const diceTotal = gameState.dice.reduce((a, b) => a + b, 0);
+        const token = player.tokens.find(t => {
+            if (t.frozenRounds > 0) return false;
+            const path = findPath(t.tileId, diceTotal, player.id, gameState);
+            if (path.length <= 1) return false;
+            const destId = path[path.length - 1];
+            if (destId !== tileId) return false;
+            // Block if own horse occupies a non-safezone tile
+            const destTile = gameState.board.flat().find(td => td?.id === destId);
+            const blockedByFriendly = destTile?.type !== TileType.SafeZone &&
+                player.tokens.some(ot => ot.tileId === destId && ot.id !== t.id);
+            return !blockedByFriendly;
+        });
+        if (!token) return;
+        setGameState(prev => {
+            const p = prev.players[prev.currentPlayerId];
+            const tk = p.tokens.find(t => t.id === token.id)!;
+            const path = findPath(tk.tileId, prev.dice.reduce((a, b) => a + b, 0), p.id, prev);
+            return path.length <= 1
+                ? endTurn(prev)
+                : { ...prev, phase: 'ANIMATING', selectedTokenId: tk.id, animation: { tokenId: tk.id, path, step: 0 } };
+        });
+    }, [gameState, handleTeleportDestinationSelect]);
+
+    const handlePhaserTokenClick = useCallback((tokenId: number) => {
+        const token = Object.values(gameState.players)
+            .flatMap(p => p.tokens)
+            .find(t => t.id === tokenId);
+        if (!token) return;
+        // In MOVE phase, clicking an opponent's token treats it as clicking that tile (kick)
+        if (gameState.phase === 'MOVE') {
+            const currentPlayer = gameState.players[gameState.currentPlayerId];
+            const isOpponent = currentPlayer.tokens.every(t => t.id !== tokenId);
+            if (isOpponent) {
+                handlePhaserTileClick(token.tileId);
+                return;
+            }
+        }
+        handleTokenSelect(token);
+    }, [gameState, handlePhaserTileClick, handleTokenSelect]);
+
+    // All destination tiles for every movable token — excludes friendly-blocked non-safezone tiles
+    const highlightTileIds = useMemo(() => {
+        if (gameState.phase !== 'MOVE') return [];
+        const player = gameState.players[gameState.currentPlayerId];
+        const diceTotal = gameState.dice.reduce((a, b) => a + b, 0);
+        if (diceTotal === 0) return [];
+        const dests = player.tokens
+            .filter(t => t.frozenRounds <= 0)
+            .flatMap(t => {
+                const path = findPath(t.tileId, diceTotal, player.id, gameState);
+                if (path.length <= 1) return [];
+                const destId = path[path.length - 1];
+                const destTile = gameState.board.flat().find(td => td?.id === destId);
+                const blockedByFriendly = destTile?.type !== TileType.SafeZone &&
+                    player.tokens.some(ot => ot.tileId === destId && ot.id !== t.id);
+                return blockedByFriendly ? [] : [destId];
+            });
+        return [...new Set(dests)];
+    }, [gameState.phase, gameState.dice, gameState]);
+
+    // Token IDs that can legally move (non-blocked) — used for idle-bounce animation
+    const movableTokenIds = useMemo(() => {
+        if (gameState.phase !== 'MOVE') return [];
+        const player = gameState.players[gameState.currentPlayerId];
+        const diceTotal = gameState.dice.reduce((a, b) => a + b, 0);
+        if (diceTotal === 0) return [];
+        return player.tokens
+            .filter(t => {
+                if (t.frozenRounds > 0) return false;
+                const path = findPath(t.tileId, diceTotal, player.id, gameState);
+                if (path.length <= 1) return false;
+                const destId = path[path.length - 1];
+                const destTile = gameState.board.flat().find(td => td?.id === destId);
+                return !(destTile?.type !== TileType.SafeZone && player.tokens.some(ot => ot.tileId === destId && ot.id !== t.id));
+            })
+            .map(t => t.id);
+    }, [gameState.phase, gameState.dice, gameState]);
+    // ── No-moves banner: auto-end turn after 2s ───────────────────────────
+    useEffect(() => {
+        if (gameState.phase !== 'MOVE' || highlightTileIds.length > 0) {
+            setNoMovesBannerVisible(false);
+            return;
+        }
+        setNoMovesBannerVisible(true);
+        const t = setTimeout(() => {
+            setNoMovesBannerVisible(false);
+            setGameState(prev => {
+                const nextState = endTurn(prev);
+                nextState.logs = addLog(nextState, `No legal moves for ${prev.players[prev.currentPlayerId].name}. Turn passed.`);
+                return nextState;
+            });
+        }, 2000);
+        return () => clearTimeout(t);
+    }, [gameState.phase, highlightTileIds.length]);
+    // ─────────────────────────────────────────────────────────────────────
+
+    // Ult button world coords for MAG bubble fly-to animation in Phaser
+    const ultButtonWorldPos = useMemo(() => ({
+        x: layout.ultButton.left + layout.ultButton.size / 2,
+        y: 900 - layout.ultButton.bottom - layout.ultButton.size / 2,
+    }), [layout.ultButton]);
+
     const handleUltimateActivate = useCallback(() => {
         const player = gameState.players[gameState.currentPlayerId];
         const ultimateDef = ULTIMATES[player.config.ultimateType];
@@ -561,6 +838,7 @@ const App: React.FC = () => {
         }
 
         // Visual feedback trigger
+        setShowUltTooltip(false);
         setUltimateActivationName(ultimateDef.name.toUpperCase());
         setTimeout(() => setUltimateActivationName(null), 2000);
 
@@ -619,6 +897,19 @@ const App: React.FC = () => {
     }, []);
 
     const handleGoalRewardResolve = useCallback((element: TileType) => {
+        // Fire Phaser animations before state update (board glow + horse absorb swirl)
+        const currentPlayerId = gameState.currentPlayerId;
+        const goalTileId = FINAL_GOALS[currentPlayerId as keyof typeof FINAL_GOALS];
+        const tokenAtGoal = gameState.players[currentPlayerId]?.tokens.find(t => t.tileId === goalTileId);
+        if (tokenAtGoal) {
+            setGoalElementChosenEvent({
+                playerId: currentPlayerId,
+                element,
+                tokenId: tokenAtGoal.id,
+                eid: Date.now(),
+            });
+        }
+
         setGameState(prev => {
             // Deep clone to prevent StrictMode double-invocation mutation bugs
             const newState = { ...prev };
@@ -664,7 +955,7 @@ const App: React.FC = () => {
             newState.logs = addLog(newState, `${player.name} chose ${element} as goal reward.`);
             return endTurn(newState);
         });
-    }, []);
+    }, [gameState]);
 
     
 
@@ -740,14 +1031,6 @@ const App: React.FC = () => {
         setGameState(prev => ({ ...prev, tileGoldEnabled: val }));
     };
 
-    const handleToggleTileIds = () => {
-        setGameState(prev => ({ ...prev, showTileIds: !prev.showTileIds }));
-    };
-
-    const handleToggleMovePreview = () => {
-        setGameState(prev => ({ ...prev, showMovePreview: !prev.showMovePreview }));
-    };
-
     const handleToggleEditMode = () => {
         const nextEditMode = !isEditMode;
         setIsEditMode(nextEditMode);
@@ -789,19 +1072,8 @@ const App: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Top Center Round Counter */}
-                {activeView === 'game' && !gameState.winner && (
-                    <div className={`flex items-center gap-4 px-6 py-2 rounded-full border-2 transition-all duration-500 ${gameState.currentRound > gameState.maxRounds - 3 ? 'border-red-600 bg-red-950/30 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'border-white/10 bg-white/5'} ${animateRound ? 'scale-110' : 'scale-100'}`}>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Match Progress</span>
-                        <div className="flex items-center gap-2">
-                            <span className={`text-2xl font-black italic tracking-tighter ${gameState.currentRound > gameState.maxRounds - 3 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-                                ROUND {gameState.currentRound}
-                            </span>
-                            <span className="text-gray-600 font-black text-xl">/</span>
-                            <span className="text-gray-400 font-black text-xl">{gameState.maxRounds}</span>
-                        </div>
-                    </div>
-                )}
+                {/* placeholder — round counter moved to game area */}
+                <div />
 
                 <div className="flex items-center gap-4">
                     <div className="flex bg-gray-900 rounded-lg p-1 border border-white/5">
@@ -819,10 +1091,6 @@ const App: React.FC = () => {
                         </button>
                     </div>
                     
-                    <button onClick={handleToggleTileIds} className={`px-4 py-2 text-xs font-black rounded-lg transition-all border uppercase tracking-wider ${gameState.showTileIds ? "bg-amber-600 text-white border-amber-400" : "bg-gray-800 text-amber-300 border-amber-900/50 hover:bg-gray-700"}`}>
-                        {gameState.showTileIds ? 'Hide IDs' : 'Show IDs'}
-                    </button>
-
                     <button
                         onClick={() => setAppScene('lobby')}
                         className="px-4 py-2 text-xs font-black rounded-lg transition-all border uppercase tracking-wider bg-gray-800 text-gray-300 border-white/10 hover:bg-gray-700"
@@ -830,14 +1098,6 @@ const App: React.FC = () => {
                         ← Lobby
                     </button>
 
-                    {isEditMode && (
-                        <button 
-                            onClick={handleToggleMovePreview} 
-                            className={`px-4 py-2 text-xs font-black rounded-lg transition-all border uppercase tracking-wider ${gameState.showMovePreview ? "bg-emerald-600 text-white border-emerald-400" : "bg-gray-800 text-emerald-300 border-emerald-900/50 hover:bg-gray-700"}`}
-                        >
-                            {gameState.showMovePreview ? 'Preview: ON' : 'Preview: OFF'}
-                        </button>
-                    )}
                     
                     <button
                         onClick={() => setIsTutorialMode(true)}
@@ -868,48 +1128,326 @@ const App: React.FC = () => {
                 </div>
             </header>
             
-            <main className="flex-grow flex items-center justify-between px-8 py-4 overflow-hidden bg-[radial-gradient(circle_at_center,rgba(30,27,75,0.2)_0%,transparent_70%)]">
+            <main className="flex-grow relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#150d30 0%,#0a0618 60%,#0d1528 100%)' }}>
                 {activeView === 'testing' && <TestingDashboard />}
                 {activeView === 'game' && (
                     <>
-                        {/* Left Side: Player 2 (Green) */}
-                        <div className="shrink-0 z-20">
+                        {/* ── HUD P1 — top left ── */}
+                        <div className="absolute z-40" style={{ left: 0, top: 0, width: 355 }}>
+                            <PlayerInfo
+                                key={`Player1-${gameKey}`}
+                                player={gameState.players.Player1}
+                                isActive={gameState.currentPlayerId === 'Player1'}
+                                onAddToken={() => setIsAddingTokenForPlayer('Player1')}
+                                disabled={gameState.phase === 'ANIMATING'}
+                                gameState={gameState}
+                            />
+                        </div>
+
+                        {/* ── HUD P2 — top right ── */}
+                        <div className="absolute z-40" style={{ right: 0, top: 0, width: 355 }}>
                             <PlayerInfo
                                 key={`Player2-${gameKey}`}
                                 player={gameState.players.Player2}
                                 isActive={gameState.currentPlayerId === 'Player2'}
-                                onAddToken={() => setIsAddingTokenForPlayer('Player2')} 
-                                disabled={gameState.phase === 'ANIMATING'} 
-                                onUltimateActivate={handleUltimateActivate}
-                                onClearManaFeedback={handleClearManaFeedback}
+                                onAddToken={() => setIsAddingTokenForPlayer('Player2')}
+                                disabled={gameState.phase === 'ANIMATING'}
                                 gameState={gameState}
-                                onRollDice={handleRollDice}
-                                onConfirmMove={handleConfirmMove}
-                                isMoveValid={isMoveValid}
-                                hasLegalMoves={hasLegalMoves}
-                                onDeadlockEndTurn={handleDeadlockEndTurn}
                             />
                         </div>
 
-                        {/* Center: Board */}
-                        <div className="relative flex-grow flex flex-col items-center justify-center gap-8">
-                            <div className="relative shadow-[0_0_150px_rgba(0,0,0,0.8)] rounded-xl bg-gray-950/40 border border-white/5 p-10">
-                                <Board 
-                                    gameState={gameState} 
-                                    isEditMode={isEditMode} 
-                                    onTokenSelect={handleTokenSelect} 
-                                    onSelectTile={setEditingTile} 
-                                    onAddTile={handleAddNewTileAtPosition} 
-                                    previewTileId={previewTileId} 
-                                    isMoveValid={isMoveValid} 
-                                    onPreviewTileClick={handleConfirmMove}
-                                    onTeleportSelect={handleTeleportDestinationSelect}
+                        {/* ── Chibi P1 — left area ── */}
+                        <div
+                            className={`absolute z-10 cursor-pointer select-none${gameState.currentPlayerId === 'Player1' ? ' animate-chibi-float' : ''}`}
+                            style={{ left: layout.p1Chibi.left, top: layout.p1Chibi.top }}
+                            onClick={() => setChibiTooltip(v => v === 'Player1' ? null : 'Player1')}
+                        >
+                            <div
+                                className={newTurnFlash === 'Player1' ? 'animate-chibi-turn-flash' : ''}
+                                style={{ fontSize: 90, lineHeight: 1 }}
+                            >🧙</div>
+                        </div>
+                        {/* P1 Ult + Mastery sidebar — LEFT of chibi */}
+                        {(() => {
+                            const p1 = gameState.players.Player1;
+                            const p1Char = CHARACTERS[p1.config.characterId];
+                            const maxTiers = LEVEL_CONFIGS[gameState.selectedLevel]?.maxComboTiers ?? 3;
+                            const p1UltCharged = p1.mana >= p1.manaCap;
+                            const p1UltDef = ULTIMATES[p1.config.ultimateType];
+                            const ORDINAL = ['1st', '2nd', '3rd'];
+                            const toggleP1 = () => setChibiTooltip(v => v === 'Player1' ? null : 'Player1');
+                            return (
+                                <div className="absolute z-20 flex flex-col items-center gap-2 pointer-events-none"
+                                     style={{ left: layout.p1Sidebar.left, top: layout.p1Sidebar.top }}>
+                                    {/* Single stacked tooltip panel — right of icons, offset so nothing overlaps */}
+                                    {chibiTooltip === 'Player1' && (
+                                        <div style={{
+                                            position: 'absolute', right: 'calc(100% + 12px)', top: 0,
+                                            animation: 'slide-in-from-right .2s cubic-bezier(0.16,1,0.3,1)',
+                                            width: 240, background: 'rgba(10,5,32,.97)',
+                                            border: '1px solid rgba(139,92,246,.3)',
+                                            borderRadius: 14, padding: '10px 12px',
+                                            boxShadow: '0 8px 32px rgba(0,0,0,.85)',
+                                            zIndex: 200, pointerEvents: 'none',
+                                            display: 'flex', flexDirection: 'column', gap: 8,
+                                        }}>
+                                            {/* Ult row */}
+                                            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                                                <div style={{
+                                                    width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                                                    background: '#0a0520', position: 'relative', overflow: 'hidden',
+                                                    border: p1UltCharged ? '2px solid rgba(167,139,250,.9)' : '2px solid rgba(120,100,200,.4)',
+                                                    boxShadow: p1UltCharged ? '0 0 12px rgba(124,58,237,.8)' : 'none',
+                                                }}>
+                                                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${(p1.mana / p1.manaCap) * 100}%`, background: 'linear-gradient(to top, #4c1d95, #7c3aed 55%, #a78bfa 90%)' }} />
+                                                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+                                                        <DiceIcon className="w-5 h-5 text-white" />
+                                                    </div>
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontSize: 11, fontWeight: 900, color: '#a78bfa', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 2 }}>
+                                                        Ultimate — {p1UltDef?.name}
+                                                    </div>
+                                                    <div style={{ fontSize: 12, color: '#d4d4d8', lineHeight: 1.5, marginBottom: 4 }}>{p1UltDef?.description}</div>
+                                                    <div style={{ fontSize: 11, color: '#a78bfa', fontWeight: 700 }}>
+                                                        {p1.mana} / {p1.manaCap} MAG{p1UltCharged && <span style={{ color: '#22c55e', marginLeft: 6 }}>● READY</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {/* Divider */}
+                                            <div style={{ height: 1, background: 'rgba(255,255,255,.08)' }} />
+                                            {/* Tier rows */}
+                                            {Array.from({ length: maxTiers }, (_, i) => i + 1).map(tier => {
+                                                const unlocked = p1.comboTier >= tier;
+                                                const tierInfo = tier === 1 ? p1Char?.comboRewards?.tier1 : tier === 2 ? p1Char?.comboRewards?.tier2 : p1Char?.comboRewards?.tier3;
+                                                return (
+                                                    <div key={tier} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                                                        <div style={{
+                                                            width: 30, height: 30, borderRadius: 7, flexShrink: 0,
+                                                            background: unlocked ? '#fbbf24' : 'rgba(60,50,90,.7)',
+                                                            border: unlocked ? '2px solid rgba(255,255,255,.35)' : '2px solid rgba(180,160,255,.3)',
+                                                            boxShadow: unlocked ? '0 0 8px rgba(251,191,36,.5)' : 'none',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        }}>
+                                                            {tier === 1 && <AtkPip className={`w-3 h-3 ${unlocked ? 'text-amber-900' : 'text-indigo-300'}`} />}
+                                                            {tier === 2 && <span style={{ fontSize: 14 }}>🔥</span>}
+                                                            {tier === 3 && <AtkPip className={`w-4 h-4 ${unlocked ? 'text-amber-900' : 'text-indigo-300'}`} />}
+                                                        </div>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontSize: 11, fontWeight: 900, color: unlocked ? '#fbbf24' : '#6b5a94', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 2 }}>
+                                                                Combo T{tier} — {tierInfo?.title ?? `Tier ${tier}`}
+                                                            </div>
+                                                            <div style={{ fontSize: 12, color: '#d4d4d8', lineHeight: 1.4, marginBottom: 2 }}>{tierInfo?.description ?? '—'}</div>
+                                                            <div style={{ fontSize: 11, fontWeight: 700, color: unlocked ? '#22c55e' : '#fb923c' }}>
+                                                                {unlocked ? '● ACTIVE' : `Unlock at ${ORDINAL[tier - 1] ?? `${tier}th`} combo`}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                    {/* Ultimate icon */}
+                                    <div
+                                        className="relative rounded-full overflow-hidden"
+                                        style={{
+                                            width: 52, height: 52, pointerEvents: 'auto', cursor: 'pointer',
+                                            background: '#0a0520',
+                                            border: p1UltCharged ? '2px solid rgba(167,139,250,.95)' : '2px solid rgba(120,100,200,.45)',
+                                            boxShadow: p1UltCharged ? '0 0 16px rgba(124,58,237,.9), 0 0 32px rgba(124,58,237,.45)' : 'none',
+                                        }}
+                                        onClick={toggleP1}
+                                    >
+                                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${(p1.mana / p1.manaCap) * 100}%`, background: 'linear-gradient(to top, #4c1d95, #7c3aed 55%, #a78bfa 90%)', transition: 'height 1.5s ease' }} />
+                                        <div className="absolute inset-0 flex items-center justify-center z-10">
+                                            <DiceIcon className="w-7 h-7 text-white drop-shadow-md" />
+                                        </div>
+                                    </div>
+                                    {/* Mastery tiers */}
+                                    {Array.from({ length: maxTiers }, (_, i) => i + 1).map(tier => {
+                                        const unlocked = p1.comboTier >= tier;
+                                        return (
+                                            <div
+                                                key={tier}
+                                                style={{
+                                                    width: 38, height: 38, borderRadius: 8,
+                                                    background: unlocked ? '#fbbf24' : 'rgba(60,50,90,.7)',
+                                                    border: unlocked ? '2px solid rgba(255,255,255,.4)' : '2px solid rgba(180,160,255,.35)',
+                                                    boxShadow: unlocked ? '0 0 10px rgba(251,191,36,.5)' : '0 0 6px rgba(100,80,200,.2)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    opacity: unlocked ? 1 : 0.8, transition: 'all .3s',
+                                                    pointerEvents: 'auto', cursor: 'pointer',
+                                                }}
+                                                onClick={toggleP1}
+                                            >
+                                                {tier === 1 && <AtkPip className={`w-4 h-4 ${unlocked ? 'text-amber-900' : 'text-indigo-300'}`} />}
+                                                {tier === 2 && <span style={{ fontSize: 16, filter: unlocked ? 'none' : 'grayscale(0.5)' }}>🔥</span>}
+                                                {tier === 3 && <AtkPip className={`w-5 h-5 ${unlocked ? 'text-amber-900' : 'text-indigo-300'}`} />}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
+
+                        {/* ── Chibi P2 — right area ── */}
+                        <div
+                            className={`absolute z-10 cursor-pointer select-none${gameState.currentPlayerId === 'Player2' ? ' animate-chibi-float' : ''}`}
+                            style={{ left: layout.p2Chibi.left, top: layout.p2Chibi.top }}
+                            onClick={() => setChibiTooltip(v => v === 'Player2' ? null : 'Player2')}
+                        >
+                            <div
+                                className={newTurnFlash === 'Player2' ? 'animate-chibi-turn-flash' : ''}
+                                style={{ fontSize: 90, lineHeight: 1 }}
+                            >🧚</div>
+                        </div>
+                        {/* P2 Ult + Mastery sidebar — RIGHT of chibi */}
+                        {(() => {
+                            const p2 = gameState.players.Player2;
+                            const p2Char = CHARACTERS[p2.config.characterId];
+                            const maxTiers = LEVEL_CONFIGS[gameState.selectedLevel]?.maxComboTiers ?? 3;
+                            const p2UltCharged = p2.mana >= p2.manaCap;
+                            const p2UltDef = ULTIMATES[p2.config.ultimateType];
+                            const ORDINAL = ['1st', '2nd', '3rd'];
+                            const toggleP2 = () => setChibiTooltip(v => v === 'Player2' ? null : 'Player2');
+                            return (
+                                <div className="absolute z-20 flex flex-col items-center gap-2 pointer-events-none"
+                                     style={{ left: layout.p2Sidebar.left, top: layout.p2Sidebar.top }}>
+                                    {/* Single stacked tooltip panel — left of icons */}
+                                    {chibiTooltip === 'Player2' && (
+                                        <div style={{
+                                            position: 'absolute', left: 'calc(100% + 12px)', top: 0,
+                                            animation: 'slide-in-from-left .2s cubic-bezier(0.16,1,0.3,1)',
+                                            width: 240, background: 'rgba(10,5,32,.97)',
+                                            border: '1px solid rgba(139,92,246,.3)',
+                                            borderRadius: 14, padding: '10px 12px',
+                                            boxShadow: '0 8px 32px rgba(0,0,0,.85)',
+                                            zIndex: 200, pointerEvents: 'none',
+                                            display: 'flex', flexDirection: 'column', gap: 8,
+                                        }}>
+                                            {/* Ult row */}
+                                            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                                                <div style={{
+                                                    width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                                                    background: '#0a0520', position: 'relative', overflow: 'hidden',
+                                                    border: p2UltCharged ? '2px solid rgba(167,139,250,.9)' : '2px solid rgba(120,100,200,.4)',
+                                                    boxShadow: p2UltCharged ? '0 0 12px rgba(124,58,237,.8)' : 'none',
+                                                }}>
+                                                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${(p2.mana / p2.manaCap) * 100}%`, background: 'linear-gradient(to top, #4c1d95, #7c3aed 55%, #a78bfa 90%)' }} />
+                                                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+                                                        <DiceIcon className="w-5 h-5 text-white" />
+                                                    </div>
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontSize: 11, fontWeight: 900, color: '#a78bfa', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 2 }}>
+                                                        Ultimate — {p2UltDef?.name}
+                                                    </div>
+                                                    <div style={{ fontSize: 12, color: '#d4d4d8', lineHeight: 1.5, marginBottom: 4 }}>{p2UltDef?.description}</div>
+                                                    <div style={{ fontSize: 11, color: '#a78bfa', fontWeight: 700 }}>
+                                                        {p2.mana} / {p2.manaCap} MAG{p2UltCharged && <span style={{ color: '#22c55e', marginLeft: 6 }}>● READY</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div style={{ height: 1, background: 'rgba(255,255,255,.08)' }} />
+                                            {Array.from({ length: maxTiers }, (_, i) => i + 1).map(tier => {
+                                                const unlocked = p2.comboTier >= tier;
+                                                const tierInfo = tier === 1 ? p2Char?.comboRewards?.tier1 : tier === 2 ? p2Char?.comboRewards?.tier2 : p2Char?.comboRewards?.tier3;
+                                                return (
+                                                    <div key={tier} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                                                        <div style={{
+                                                            width: 30, height: 30, borderRadius: 7, flexShrink: 0,
+                                                            background: unlocked ? '#fbbf24' : 'rgba(60,50,90,.7)',
+                                                            border: unlocked ? '2px solid rgba(255,255,255,.35)' : '2px solid rgba(180,160,255,.3)',
+                                                            boxShadow: unlocked ? '0 0 8px rgba(251,191,36,.5)' : 'none',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        }}>
+                                                            {tier === 1 && <AtkPip className={`w-3 h-3 ${unlocked ? 'text-amber-900' : 'text-indigo-300'}`} />}
+                                                            {tier === 2 && <span style={{ fontSize: 14 }}>🔥</span>}
+                                                            {tier === 3 && <AtkPip className={`w-4 h-4 ${unlocked ? 'text-amber-900' : 'text-indigo-300'}`} />}
+                                                        </div>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontSize: 11, fontWeight: 900, color: unlocked ? '#fbbf24' : '#6b5a94', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 2 }}>
+                                                                Combo T{tier} — {tierInfo?.title ?? `Tier ${tier}`}
+                                                            </div>
+                                                            <div style={{ fontSize: 12, color: '#d4d4d8', lineHeight: 1.4, marginBottom: 2 }}>{tierInfo?.description ?? '—'}</div>
+                                                            <div style={{ fontSize: 11, fontWeight: 700, color: unlocked ? '#22c55e' : '#fb923c' }}>
+                                                                {unlocked ? '● ACTIVE' : `Unlock at ${ORDINAL[tier - 1] ?? `${tier}th`} combo`}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                    {/* Ultimate icon */}
+                                    <div
+                                        className="relative rounded-full overflow-hidden"
+                                        style={{
+                                            width: 52, height: 52, pointerEvents: 'auto', cursor: 'pointer',
+                                            background: '#0a0520',
+                                            border: p2UltCharged ? '2px solid rgba(167,139,250,.95)' : '2px solid rgba(120,100,200,.45)',
+                                            boxShadow: p2UltCharged ? '0 0 16px rgba(124,58,237,.9), 0 0 32px rgba(124,58,237,.45)' : 'none',
+                                        }}
+                                        onClick={toggleP2}
+                                    >
+                                        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${(p2.mana / p2.manaCap) * 100}%`, background: 'linear-gradient(to top, #4c1d95, #7c3aed 55%, #a78bfa 90%)', transition: 'height 1.5s ease' }} />
+                                        <div className="absolute inset-0 flex items-center justify-center z-10">
+                                            <DiceIcon className="w-7 h-7 text-white drop-shadow-md" />
+                                        </div>
+                                    </div>
+                                    {/* Mastery tiers */}
+                                    {Array.from({ length: maxTiers }, (_, i) => i + 1).map(tier => {
+                                        const unlocked = p2.comboTier >= tier;
+                                        return (
+                                            <div
+                                                key={tier}
+                                                style={{
+                                                    width: 38, height: 38, borderRadius: 8,
+                                                    background: unlocked ? '#fbbf24' : 'rgba(60,50,90,.7)',
+                                                    border: unlocked ? '2px solid rgba(255,255,255,.4)' : '2px solid rgba(180,160,255,.35)',
+                                                    boxShadow: unlocked ? '0 0 10px rgba(251,191,36,.5)' : '0 0 6px rgba(100,80,200,.2)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    opacity: unlocked ? 1 : 0.8, transition: 'all .3s',
+                                                    pointerEvents: 'auto', cursor: 'pointer',
+                                                }}
+                                                onClick={toggleP2}
+                                            >
+                                                {tier === 1 && <AtkPip className={`w-4 h-4 ${unlocked ? 'text-amber-900' : 'text-indigo-300'}`} />}
+                                                {tier === 2 && <span style={{ fontSize: 16, filter: unlocked ? 'none' : 'grayscale(0.5)' }}>🔥</span>}
+                                                {tier === 3 && <AtkPip className={`w-5 h-5 ${unlocked ? 'text-amber-900' : 'text-indigo-300'}`} />}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
+
+                        {/* ── Board — fills entire main area ── */}
+                        <div className="absolute inset-0">
+                            <div className="relative w-full h-full">
+                                <PhaserGame
+                                    gameState={gameState}
+                                    onTileClick={handlePhaserTileClick}
+                                    onTokenClick={handlePhaserTokenClick}
+                                    highlightTileIds={highlightTileIds}
+                                    movableTokenIds={movableTokenIds}
+                                    boardConfig={layout.board}
+                                    isEditMode={isEditMode}
+                                    width={1280}
+                                    height={900}
+                                    atkAbsorbEvent={atkAbsorbEvent}
+                                    magAbsorbEvent={magAbsorbEvent}
+                                    ultButtonWorldPos={ultButtonWorldPos}
+                                    elementAddedEvent={elementAddedEvent}
+                                    goalReachedEvent={goalReachedEvent}
+                                    goalElementChosenEvent={goalElementChosenEvent}
+                                    onGoalAnimationDone={handleGoalAnimationDone}
                                 />
 
                                 <div className="absolute inset-0 pointer-events-none z-[60]">
                                     {visualEffects.map(effect => (
-                                        <div 
-                                            key={effect.id} 
+                                        <div
+                                            key={effect.id}
                                             className={`absolute whitespace-nowrap font-black uppercase italic ${effect.type === 'kick' ? 'animate-kick-label text-4xl text-red-500' : effect.type === 'atk' ? 'animate-float-up-impact text-2xl text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]' : 'animate-float-up-impact text-4xl streak-impact'}`}
                                             style={{ left: effect.x, top: effect.y, transform: 'translate(-50%, -100%)' }}
                                         >
@@ -917,8 +1455,8 @@ const App: React.FC = () => {
                                         </div>
                                     ))}
                                 </div>
-                                
-                                {/* Ultimate Activation Visual Feedback Overlay */}
+
+                                {/* Ultimate Activation Visual Feedback */}
                                 {ultimateActivationName && (
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[100]">
                                         <div className="ultimate-activation-text text-6xl font-black italic tracking-tighter uppercase animate-glow-spread">
@@ -953,31 +1491,263 @@ const App: React.FC = () => {
                                     </div>
                                 )}
                             </div>
+                        </div>
 
-                            {/* Game Log - Below board */}
-                            <div className="w-full max-w-2xl z-20">
-                                <GameLog logs={gameState.logs} />
+                        {/* ── Game Log — bottom center ── */}
+                        <div className="absolute z-20" style={{ bottom: 8, left: '50%', transform: 'translateX(-50%)', width: 420 }}>
+                            <GameLog logs={gameState.logs} />
+                        </div>
+
+                        {/* ── Round counter — top center, between HUDs ── */}
+                        {!gameState.winner && (
+                            <div className="absolute z-40 pointer-events-none flex flex-col items-center gap-1"
+                                 style={{ left: '50%', top: 10, transform: 'translateX(-50%)' }}>
+                                <div className={`flex items-center gap-3 px-5 py-1.5 rounded-full transition-all duration-500 ${gameState.currentRound > gameState.maxRounds - 3 ? 'bg-red-950/80 border border-red-500/60 shadow-[0_0_16px_rgba(239,68,68,0.4)]' : 'border border-white/15'} ${animateRound ? 'scale-110' : 'scale-100'}`}
+                                     style={{ background: gameState.currentRound > gameState.maxRounds - 3 ? undefined : 'rgba(255,255,255,.07)', backdropFilter: 'blur(8px)' }}>
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Round</span>
+                                    <span className={`text-xl font-black italic tracking-tighter ${gameState.currentRound > gameState.maxRounds - 3 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
+                                        {gameState.currentRound}
+                                    </span>
+                                    <span className="text-gray-600 font-black">/</span>
+                                    <span className="text-gray-300 font-black">{gameState.maxRounds}</span>
+                                </div>
+
+                                {/* Turn indicator — just below round counter */}
+                                <div className="flex items-center gap-2 rounded-full px-4 py-1 text-xs font-bold whitespace-nowrap"
+                                     style={{ background: 'rgba(0,0,0,.65)', border: '1px solid rgba(255,100,50,.35)', color: '#ff9060' }}>
+                                    <span className="w-2 h-2 rounded-full animate-pulse"
+                                          style={{ background: '#f87171', boxShadow: '0 0 8px rgba(248,113,113,.8)' }} />
+                                    {gameState.players[gameState.currentPlayerId]?.name ?? gameState.currentPlayerId}'s Turn
+                                </div>
                             </div>
-                        </div>
+                        )}
 
-                        {/* Right Side: Player 1 (Red) */}
-                        <div className="shrink-0 z-20">
-                            <PlayerInfo
-                                key={`Player1-${gameKey}`}
-                                player={gameState.players.Player1}
-                                isActive={gameState.currentPlayerId === 'Player1'}
-                                onAddToken={() => setIsAddingTokenForPlayer('Player1')} 
-                                disabled={gameState.phase === 'ANIMATING'} 
-                                onUltimateActivate={handleUltimateActivate}
-                                onClearManaFeedback={handleClearManaFeedback}
-                                gameState={gameState}
-                                onRollDice={handleRollDice}
-                                onConfirmMove={handleConfirmMove}
-                                isMoveValid={isMoveValid}
-                                hasLegalMoves={hasLegalMoves}
-                                onDeadlockEndTurn={handleDeadlockEndTurn}
-                            />
-                        </div>
+                        {/* ── Dice result overlay — shown after roll, until move/end turn ── */}
+                        {!gameState.winner && gameState.dice.length > 0 && gameState.phase === 'MOVE' && (
+                            <div className="absolute z-50 pointer-events-none"
+                                 style={{ left: '50%', top: 80, transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                                {/* Two dice */}
+                                <div style={{ display: 'flex', gap: 10 }}>
+                                    {gameState.dice.map((v, i) => (
+                                        <div key={i} style={{ transform: 'scale(.75)', transformOrigin: 'top center' }}>
+                                            <Dice value={v} />
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Sum — below dice */}
+                                <div style={{
+                                    fontSize: 44, fontWeight: 900, color: '#fff',
+                                    letterSpacing: '-.03em',
+                                    textShadow: '0 0 24px rgba(255,255,255,.5), 0 2px 8px rgba(0,0,0,.9)',
+                                    lineHeight: 1,
+                                }}>
+                                    {gameState.dice.reduce((a, b) => a + b, 0)}
+                                </div>
+                                {/* No-moves banner */}
+                                {noMovesBannerVisible && (
+                                    <div style={{
+                                        fontSize: 13, fontWeight: 900, color: '#f87171',
+                                        background: 'rgba(30,0,0,.85)', border: '1px solid rgba(248,113,113,.4)',
+                                        borderRadius: 10, padding: '6px 16px',
+                                        textTransform: 'uppercase', letterSpacing: '.06em',
+                                        textShadow: '0 0 12px rgba(248,113,113,.7)',
+                                    }}>
+                                        All horses cannot move — ending turn…
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ── Use Ultimate — bottom left (active player's turn, always visible) ── */}
+                        {!gameState.winner && (() => {
+                            const ap = gameState.players[gameState.currentPlayerId];
+                            const ultDef = ULTIMATES[ap?.config?.ultimateType];
+                            if (!ap) return null;
+                            const isCharged = ap.mana >= ap.manaCap;
+                            const canActivate = isCharged && gameState.phase === 'SELECT_DICE';
+                            const isAnimating = gameState.phase === 'ANIMATING';
+
+                            // Affinity → glow color
+                            const AFFINITY_GLOW: Record<string, [string, string, string]> = {
+                                fire:     ['#ef4444', 'rgba(239,68,68,.8)',   'rgba(239,68,68,.45)'],
+                                ice:      ['#3b82f6', 'rgba(59,130,246,.8)',  'rgba(59,130,246,.45)'],
+                                grass:    ['#22c55e', 'rgba(34,197,94,.8)',   'rgba(34,197,94,.45)'],
+                                rock:     ['#9ca3af', 'rgba(156,163,175,.8)','rgba(156,163,175,.45)'],
+                            };
+                            const aff = ap.elementAffinity as string | undefined;
+                            const [, borderCol, glowCol] = (aff && AFFINITY_GLOW[aff]) || ['#a78bfa', 'rgba(167,139,250,.8)', 'rgba(124,58,237,.45)'];
+
+                            return (
+                                <>
+                                    {/* Round liquid-fill ultimate button */}
+                                    <button
+                                        onClick={() => {
+                                            if (isAnimating) return;
+                                            if (canActivate) {
+                                                handleUltimateActivate();
+                                            } else {
+                                                setShowUltTooltip(v => !v);
+                                            }
+                                        }}
+                                        className="absolute z-50"
+                                        style={{
+                                            bottom: layout.ultButton.bottom, left: layout.ultButton.left,
+                                            width: layout.ultButton.size, height: layout.ultButton.size,
+                                            borderRadius: '50%',
+                                            padding: 0,
+                                            overflow: 'hidden',
+                                            background: '#0a0520',
+                                            border: `2px solid ${isCharged ? borderCol : 'rgba(100,80,180,.4)'}`,
+                                            boxShadow: isCharged
+                                                ? `0 0 24px ${glowCol}, 0 0 48px ${glowCol}`
+                                                : '0 2px 12px rgba(0,0,0,.6)',
+                                            animation: canActivate ? 'affinity-pulse 1.5s ease-in-out infinite' : 'none',
+                                            transition: 'box-shadow .4s, border-color .4s',
+                                            cursor: isAnimating ? 'default' : 'pointer',
+                                            opacity: isAnimating ? 0.4 : 1,
+                                        }}
+                                    >
+                                        {/* Liquid fill */}
+                                        <div style={{
+                                            position: 'absolute', bottom: 0, left: 0, right: 0,
+                                            height: `${(ap.mana / ap.manaCap) * 100}%`,
+                                            background: 'linear-gradient(to top, #4c1d95, #7c3aed 55%, #a78bfa 90%)',
+                                            transition: 'height 1.5s ease',
+                                        }} />
+                                        {/* Icon */}
+                                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                                            <DiceIcon className="w-[61px] h-[61px] text-white drop-shadow-md" style={{ opacity: isCharged ? 1 : 0.6 } as React.CSSProperties} />
+                                        </div>
+                                    </button>
+
+                                    {/* MAG feedback floaters near ult button */}
+                                    {magFeedbacks.map(fb => (
+                                        <div
+                                            key={fb.id}
+                                            className="absolute pointer-events-none animate-float-up-impact sp-floating-text font-black text-xl"
+                                            style={{ bottom: layout.ultButton.size + 8, left: layout.ultButton.left + layout.ultButton.size / 2, transform: 'translateX(-50%)' }}
+                                        >
+                                            +{fb.amount} MAG
+                                        </div>
+                                    ))}
+
+                                    {/* Tooltip — shown when not charged and toggled */}
+                                    {showUltTooltip && !isCharged && (
+                                        <div className="absolute z-[60] pointer-events-none ultimate-tooltip"
+                                             style={{
+                                                 bottom: 108, left: 20,
+                                                 width: 200,
+                                                 background: 'rgba(10,5,32,.96)',
+                                                 border: '1px solid rgba(139,92,246,.3)',
+                                                 borderRadius: 12,
+                                                 padding: '12px 14px',
+                                                 boxShadow: '0 8px 32px rgba(0,0,0,.8)',
+                                             }}>
+                                            <div style={{ fontSize: 11, fontWeight: 900, color: '#e2d9f3', letterSpacing: '.04em', marginBottom: 4, textTransform: 'uppercase' }}>
+                                                {ultDef?.name ?? 'Ultimate'}
+                                            </div>
+                                            <div style={{ fontSize: 10, color: '#9ca3af', lineHeight: 1.5, marginBottom: 8 }}>
+                                                {ultDef?.description}
+                                            </div>
+                                            <div style={{ fontSize: 10, color: '#a78bfa', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <span style={{ fontWeight: 900 }}>{ap.mana}</span>
+                                                <span style={{ color: '#4b3a70' }}>/</span>
+                                                <span style={{ fontWeight: 900 }}>{ap.manaCap}</span>
+                                                <span style={{ color: '#6b5a94', marginLeft: 2 }}>MAG</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
+
+                        {/* ── Roll / Confirm / End Turn — bottom right ── */}
+                        {!gameState.winner && (() => {
+                            const phase = gameState.phase;
+                            const isAnimating = phase === 'ANIMATING';
+
+                            if (phase === 'MOVE') {
+                                if (!hasLegalMoves) {
+                                    return (
+                                        <button
+                                            onClick={handleDeadlockEndTurn}
+                                            className="absolute z-50 font-black uppercase text-white text-sm tracking-tighter"
+                                            style={{
+                                                bottom: layout.rollButton.bottom, right: layout.rollButton.right,
+                                                background: '#dc2626',
+                                                border: '2px solid rgba(248,113,113,.6)',
+                                                borderRadius: 18,
+                                                padding: '14px 20px',
+                                                boxShadow: '0 4px 20px rgba(220,38,38,.5)',
+                                            }}
+                                        >
+                                            No Moves — End Turn
+                                        </button>
+                                    );
+                                }
+                                // Player clicks destination tile directly — no confirm button needed
+                                return null;
+                            }
+
+                            if (phase === 'SELECT_DICE') {
+                                return (
+                                    <div className="absolute z-50" style={{ bottom: layout.rollButton.bottom, right: layout.rollButton.right, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                                        {/* Power Roll progress bar — shown while rolling */}
+                                        {isRolling && (
+                                            <div style={{ position: 'relative', width: 180, height: 28, borderRadius: 6, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,.6)' }}>
+                                                <div style={{ display: 'flex', height: '100%' }}>
+                                                    {POWER_RANGES.map(([lo, hi], i) => {
+                                                        const colors = ['#ef4444','#f97316','#eab308','#22c55e'];
+                                                        return (
+                                                            <div key={i} style={{ flex: 1, background: colors[i], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: '#fff', borderRight: i < 3 ? '1px solid rgba(0,0,0,.2)' : 'none' }}>
+                                                                {lo}–{hi}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                {/* needle */}
+                                                <div style={{
+                                                    position: 'absolute', top: 0, bottom: 0, width: 3,
+                                                    background: '#fff',
+                                                    boxShadow: '0 0 8px #fff',
+                                                    left: `calc(${rollProgress * 100}% - 1.5px)`,
+                                                    transition: 'none',
+                                                }} />
+                                            </div>
+                                        )}
+                                        {/* Circular Roll button */}
+                                        <button
+                                            onClick={handleToggleRoll}
+                                            disabled={isAnimating}
+                                            style={{
+                                                width: layout.rollButton.size, height: layout.rollButton.size,
+                                                borderRadius: '50%',
+                                                background: isRolling ? 'rgba(255,255,255,.15)' : '#fff',
+                                                border: isRolling ? '3px solid rgba(255,255,255,.6)' : '3px solid rgba(0,0,0,.1)',
+                                                boxShadow: isRolling ? '0 0 24px rgba(255,255,255,.4)' : '0 4px 20px rgba(0,0,0,.5)',
+                                                color: isRolling ? '#fff' : '#111',
+                                                fontSize: 22,
+                                                fontWeight: 900,
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '.04em',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: 2,
+                                                transition: 'background .15s, box-shadow .15s',
+                                            }}
+                                        >
+                                            <span style={{ fontSize: 48, lineHeight: 1 }}>🎲</span>
+                                            <span>{isRolling ? 'STOP' : 'ROLL'}</span>
+                                        </button>
+                                    </div>
+                                );
+                            }
+
+                            return null;
+                        })()}
                     </>
                 )}
 
@@ -992,18 +1762,19 @@ const App: React.FC = () => {
                 )}
 
                 {gameState.phase === 'EMPTY_TILE_INTERACTION' && (
-                    <EmptyTilePopup 
+                    <EmptyTilePopup
                         gameState={gameState}
                         onResolve={handleEmptyTileResolve}
                         onSkip={handleEmptyTileSkip}
                         onMinimize={handleEmptyTileMinimize}
+                        layout={layout}
+                        isEditMode={isEditMode}
                     />
                 )}
 
-                {gameState.phase === 'GOAL_REWARD_SELECTION' && (
-                    <GoalRewardPopup 
+                {gameState.phase === 'GOAL_REWARD_SELECTION' && !isGoalAnimating && (
+                    <GoalRewardPopup
                         playerName={gameState.players[gameState.currentPlayerId].name}
-                        elementQueue={gameState.players[gameState.currentPlayerId].elementQueue}
                         onSelect={handleGoalRewardResolve}
                     />
                 )}
@@ -1016,7 +1787,13 @@ const App: React.FC = () => {
                 )}
                 
                 {isEditMode && (
-                    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-gray-950 p-6 rounded-2xl border border-indigo-500 shadow-2xl z-50 flex flex-col gap-4 backdrop-blur-xl max-w-5xl">
+                    <motion.div
+                        drag
+                        dragMomentum={false}
+                        dragElastic={0}
+                        className="fixed bg-gray-950 p-6 rounded-2xl border border-indigo-500 shadow-2xl z-50 flex flex-col gap-4 backdrop-blur-xl max-w-5xl cursor-grab active:cursor-grabbing"
+                        style={{ bottom: 40, left: '50%', x: '-50%' }}
+                    >
                         <div className="flex gap-6 items-start border-b border-white/10 pb-4 overflow-x-auto">
                             <div className="flex flex-col gap-2 shrink-0">
                                 <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300">Global Settings</span>
@@ -1031,83 +1808,117 @@ const App: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                            <div className="w-px h-12 bg-white/10 self-center shrink-0" />
-                            {['Player1', 'Player2'].map((pId) => (
-                              <div key={pId} className="flex flex-col gap-2 shrink-0">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300">{pId === 'Player1' ? 'Red' : 'Green'} Config</span>
-                                <div className="flex gap-2">
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[9px] text-gray-500 font-bold uppercase">Ult Type</label>
-                                    <select 
-                                      value={gameState.players[pId as PlayerID].config.ultimateType}
-                                      onChange={(e) => {
-                                        const type = e.target.value as 'extraRoll' | 'teleport';
-                                        setGameState(prev => {
-                                            const fresh = generateDefaultGameState(prev.tileGoldEnabled);
-                                            return {
-                                                ...fresh,
-                                                maxRounds: prev.maxRounds,
-                                                accuracyRate: prev.accuracyRate,
-                                                players: Object.keys(prev.players).reduce((acc, pKey) => {
-                                                    const id = pKey as PlayerID;
-                                                    const config = { ...prev.players[id].config };
-                                                    if (id === pId) {
-                                                        config.ultimateType = type;
-                                                        const newCost = ULTIMATES[type].cost;
-                                                        config.ultimateCost = newCost;
-                                                        acc[id] = { ...fresh.players[id], config, manaCap: newCost };
-                                                    } else {
-                                                        acc[id] = { ...fresh.players[id], config };
-                                                    }
-                                                    return acc;
-                                                }, {} as Record<PlayerID, PlayerState>),
-                                                logs: [`${pId} config updated. Starting new match...`]
-                                            };
-                                        });
-                                      }}
-                                      className="bg-gray-900 border border-gray-800 text-white text-[10px] rounded p-1"
-                                    >
-                                      <option value="extraRoll">Extra Roll</option>
-                                      <option value="teleport">Teleport</option>
-                                      
-                                    </select>
-                                  </div>
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[9px] text-gray-500 font-bold uppercase">Ult Cost</label>
-                                    <input 
-                                      type="number" 
-                                      value={gameState.players[pId as PlayerID].config.ultimateCost} 
-                                      onChange={(e) => {
-                                        const cost = parseInt(e.target.value, 10);
-                                        setGameState(prev => {
-                                            const fresh = generateDefaultGameState(prev.tileGoldEnabled);
-                                            return {
-                                                ...fresh,
-                                                maxRounds: prev.maxRounds,
-                                                accuracyRate: prev.accuracyRate,
-                                                players: Object.keys(prev.players).reduce((acc, pKey) => {
-                                                    const id = pKey as PlayerID;
-                                                    const config = { ...prev.players[id].config };
-                                                    if (id === pId) config.ultimateCost = isNaN(cost) ? 0 : cost;
-                                                    acc[id] = { ...fresh.players[id], config, manaCap: config.ultimateCost };
-                                                    return acc;
-                                                }, {} as Record<PlayerID, PlayerState>),
-                                                logs: [`${pId} config updated. Starting new match...`]
-                                            };
-                                        });
-                                      }}
-                                      className="bg-gray-900 border border-gray-800 text-white text-[10px] rounded p-1 w-10"
-                                    />
-                                  </div>
+
+                            {/* Ultimate Button Config */}
+                            <div className="flex flex-col gap-2 shrink-0 border-l border-white/10 pl-6">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-violet-400">Ult Button</span>
+                                <div className="grid grid-cols-3 gap-x-4 gap-y-2">
+                                    {([
+                                        ['Bottom', 'bottom', 5],
+                                        ['Left',   'left',   5],
+                                        ['Size',   'size',   4],
+                                    ] as [string, keyof typeof layout.ultButton, number][]).map(([label, axis, step]) => (
+                                        <div key={axis} className="flex flex-col gap-1">
+                                            <label className="text-[9px] text-gray-500 font-bold uppercase">{label}</label>
+                                            <input
+                                                type="number"
+                                                value={layout.ultButton[axis]}
+                                                step={step}
+                                                min={axis === 'size' ? 40 : 0}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                                    setLayout(l => ({ ...l, ultButton: { ...l.ultButton, [axis]: parseInt(e.target.value, 10) } }))
+                                                }
+                                                className="bg-gray-900 border border-gray-800 text-white font-bold rounded-lg px-2 py-1 w-16 text-xs"
+                                            />
+                                        </div>
+                                    ))}
                                 </div>
-                              </div>
-                            ))}
+                            </div>
+
+                            {/* Roll Button Config */}
+                            <div className="flex flex-col gap-2 shrink-0 border-l border-white/10 pl-6">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400">Roll Button</span>
+                                <div className="grid grid-cols-3 gap-x-4 gap-y-2">
+                                    {([
+                                        ['Bottom', 'bottom', 5],
+                                        ['Right',  'right',  5],
+                                        ['Size',   'size',   4],
+                                    ] as [string, keyof typeof layout.rollButton, number][]).map(([label, axis, step]) => (
+                                        <div key={axis} className="flex flex-col gap-1">
+                                            <label className="text-[9px] text-gray-500 font-bold uppercase">{label}</label>
+                                            <input
+                                                type="number"
+                                                value={layout.rollButton[axis]}
+                                                step={step}
+                                                min={axis === 'size' ? 40 : 0}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                                    setLayout(l => ({ ...l, rollButton: { ...l.rollButton, [axis]: parseInt(e.target.value, 10) } }))
+                                                }
+                                                className="bg-gray-900 border border-gray-800 text-white font-bold rounded-lg px-2 py-1 w-16 text-xs"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                                <button
+                                    onClick={() => setLayout(DEFAULT_LAYOUT)}
+                                    className="text-[9px] font-black uppercase text-gray-500 hover:text-white transition-colors mt-1 text-left"
+                                >
+                                    Reset to default
+                                </button>
+                            </div>
+
+                            {/* Tool Popup Position */}
+                            <div className="flex flex-col gap-2 shrink-0 border-l border-white/10 pl-6">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-yellow-400">Tool Popup</span>
+                                <p className="text-[9px] text-zinc-500">Offset from bottom-center</p>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                    {(['x', 'y'] as const).map(axis => (
+                                        <div key={axis} className="flex flex-col gap-1">
+                                            <label className="text-[9px] text-gray-500 font-bold uppercase">{axis.toUpperCase()}</label>
+                                            <input
+                                                type="number"
+                                                value={layout.toolPopup[axis]}
+                                                step={5}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                                    setLayout(l => ({ ...l, toolPopup: { ...l.toolPopup, [axis]: parseInt(e.target.value, 10) } }))
+                                                }
+                                                className="bg-gray-900 border border-gray-800 text-white font-bold rounded-lg px-2 py-1 w-16 text-xs"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Interactive Queue Position */}
+                            <div className="flex flex-col gap-2 shrink-0 border-l border-white/10 pl-6">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-cyan-300">Queue Position</span>
+                                <p className="text-[9px] text-zinc-500">Offset from bottom-center</p>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                    {(['x', 'y'] as const).map(axis => (
+                                        <div key={axis} className="flex flex-col gap-1">
+                                            <label className="text-[9px] text-gray-500 font-bold uppercase">{axis.toUpperCase()}</label>
+                                            <input
+                                                type="number"
+                                                value={layout.interactiveQueue[axis]}
+                                                step={5}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                                    setLayout(l => ({ ...l, interactiveQueue: { ...l.interactiveQueue, [axis]: parseInt(e.target.value, 10) } }))
+                                                }
+                                                className="bg-gray-900 border border-gray-800 text-white font-bold rounded-lg px-2 py-1 w-16 text-xs"
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                         <div className="flex justify-end gap-3">
-                            <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 hover:bg-indigo-500 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg">Import JSON</button>
+                            <button onClick={handleExportTiles} className="bg-emerald-700 hover:bg-emerald-600 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg">Export Tiles JSON</button>
+                            <button onClick={() => tileImportRef.current?.click()} className="bg-teal-700 hover:bg-teal-600 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg">Import Tiles JSON</button>
+                            <input type="file" ref={tileImportRef} onChange={handleImportTiles} className="hidden" accept="application/json" />
+                            <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 hover:bg-indigo-500 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg">Import Map JSON</button>
                             <input type="file" ref={fileInputRef} onChange={handleImportMap} className="hidden" accept="application/json" />
                         </div>
-                    </div>
+                    </motion.div>
                 )}
             </main>
 

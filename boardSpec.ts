@@ -66,10 +66,10 @@ export const ARM_PATHS: Record<PlayerID, number[]> = {
 // =====================================
 
 export const MAIN_LOOP_ORDER: PlayerID[] = [
-  'Player1', // bottom-right
-  'Player3', // top-right
-  'Player2', // top-left
-  'Player4', // bottom-left
+  'Player1', // top-right
+  'Player3', // top-left 
+  'Player2', // bottom-left
+  'Player4', // bottom-right 
 ];
 
 // =====================================
@@ -115,43 +115,41 @@ export const BRANCH_RULES: BranchRule[] = [
 // =====================================
 
 export const TILE_ELEMENTS: Record<number, ElementType> = {
-  // Entry Tiles (Boss Tiles)
-  33: ElementType.Fire,
-  7: ElementType.WaterIce,
-  49: ElementType.GrassWood,
-  10: ElementType.Earth,
-
   // Fire
-  32: ElementType.Fire,
-  55: ElementType.Fire,
-  14: ElementType.Fire,
+  6:  ElementType.Fire,
+  13: ElementType.Fire,
   18: ElementType.Fire,
-  4: ElementType.Fire,
-  34: ElementType.Fire,
+  24: ElementType.Fire,
+  29: ElementType.Fire,
+  35: ElementType.Fire,
+  40: ElementType.Fire,
 
   // Water / Ice
-  59: ElementType.WaterIce,
-  48: ElementType.WaterIce,
-  8: ElementType.WaterIce,
-  57: ElementType.WaterIce,
-  11: ElementType.WaterIce,
-  46: ElementType.WaterIce,
+  2:  ElementType.WaterIce,
+  7:  ElementType.WaterIce,
+  14: ElementType.WaterIce,
+  19: ElementType.WaterIce,
+  25: ElementType.WaterIce,
+  32: ElementType.WaterIce,
+  36: ElementType.WaterIce,
 
   // Grass / Wood
-  50: ElementType.GrassWood,
-  47: ElementType.GrassWood,
-  58: ElementType.GrassWood,
-  6: ElementType.GrassWood,
-  9: ElementType.GrassWood,
-  60: ElementType.GrassWood,
+  5:  ElementType.GrassWood,
+  12: ElementType.GrassWood,
+  16: ElementType.GrassWood,
+  22: ElementType.GrassWood,
+  27: ElementType.GrassWood,
+  34: ElementType.GrassWood,
+  39: ElementType.GrassWood,
 
   // Earth
-  41: ElementType.Earth,
-  36: ElementType.Earth,
-  1: ElementType.Earth,
+  4:  ElementType.Earth,
+  9: ElementType.Earth,
   15: ElementType.Earth,
-  23: ElementType.Earth,
-  52: ElementType.Earth,
+  20: ElementType.Earth,
+  26: ElementType.Earth,
+  33: ElementType.Earth,
+  38: ElementType.Earth,
 };
 
 // =====================================
