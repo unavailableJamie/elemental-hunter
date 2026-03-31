@@ -779,6 +779,7 @@ export const NormalTilePreviewPopup: React.FC<NormalTilePreviewPopupProps> = ({
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 50, opacity: 0 }}
                     transition={{ type: 'spring', damping: 20, stiffness: 260 }}
+                    onPointerDown={e => e.stopPropagation()}
                 >
                     {/* PREVIEW badge */}
                     <div className="flex justify-center mb-1.5">

@@ -256,14 +256,21 @@
 
   /* Affinity-colored pulse for Ultimate button — color set via inline border/box-shadow */
   @keyframes affinity-pulse {
-    0%, 100% { transform: scale(1);    opacity: 1; }
-    50%       { transform: scale(1.07); opacity: 0.95; }
+    0%, 100% { transform: scale(1);    }
+    50%       { transform: scale(1.11); }
   }
 
   /* Pulsing radial glow backdrop behind ult button when canActivate */
   @keyframes ult-glow-pulse {
-    0%, 100% { opacity: 0.55; transform: scale(1); }
-    50%       { opacity: 1;   transform: scale(1.18); }
+    0%, 100% { opacity: 0.75; transform: scale(1);    }
+    50%       { opacity: 1;   transform: scale(1.45); }
+  }
+
+  /* Sonar ring expands outward from ult button */
+  @keyframes ult-ring-expand {
+    0%   { transform: scale(1);   opacity: 1;   }
+    75%  { transform: scale(2.4); opacity: 0;   }
+    100% { transform: scale(2.4); opacity: 0;   }
   }
 
   /* Chibi tooltip slide-in from right (for P1, panel appears to the left) */

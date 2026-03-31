@@ -197,17 +197,17 @@ const App: React.FC = () => {
     const [noMovesBannerVisible, setNoMovesBannerVisible] = useState(false);
     // Normal-tile toolbox preview
     const [normalTilePreviewVisible, setNormalTilePreviewVisible] = useState(false);
-    const normalTileHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Auto-close after 10s, or immediately on any pointer action
+    // Auto-close after 10s, or when pointer down fires outside the popup
+    // (clicks inside the popup call stopPropagation so this won't fire for them)
     useEffect(() => {
         if (!normalTilePreviewVisible) return;
         const close = () => setNormalTilePreviewVisible(false);
         const autoClose = setTimeout(close, 10_000);
-        window.addEventListener('pointerdown', close, { capture: true });
+        window.addEventListener('pointerdown', close);
         return () => {
             clearTimeout(autoClose);
-            window.removeEventListener('pointerdown', close, { capture: true });
+            window.removeEventListener('pointerdown', close);
         };
     }, [normalTilePreviewVisible]);
     // MAG feedback near ult button
@@ -771,17 +771,6 @@ const App: React.FC = () => {
         }
     }, [gameState, handleTeleportDestinationSelect]);
 
-    const handleNormalTileHover = useCallback((tileId: number | null) => {
-        if (normalTileHideTimerRef.current) clearTimeout(normalTileHideTimerRef.current);
-        if (tileId !== null) {
-            setNormalTilePreviewVisible(true);
-        } else {
-            // Short delay prevents flicker when cursor briefly exits between tiles
-            normalTileHideTimerRef.current = setTimeout(() => {
-                setNormalTilePreviewVisible(false);
-            }, 120);
-        }
-    }, []);
 
     const handlePhaserTokenClick = useCallback((tokenId: number) => {
         const token = Object.values(gameState.players)
@@ -1493,7 +1482,6 @@ const App: React.FC = () => {
                                     goalReachedEvent={goalReachedEvent}
                                     goalElementChosenEvent={goalElementChosenEvent}
                                     onGoalAnimationDone={handleGoalAnimationDone}
-                                    onNormalTileHover={handleNormalTileHover}
                                 />
 
                                 <div className="absolute inset-0 pointer-events-none z-[60]">
@@ -1621,29 +1609,44 @@ const App: React.FC = () => {
 
                             // Affinity → glow color
                             const AFFINITY_GLOW: Record<string, [string, string, string]> = {
-                                fire:     ['#ef4444', 'rgba(239,68,68,.8)',   'rgba(239,68,68,.45)'],
-                                ice:      ['#3b82f6', 'rgba(59,130,246,.8)',  'rgba(59,130,246,.45)'],
-                                grass:    ['#22c55e', 'rgba(34,197,94,.8)',   'rgba(34,197,94,.45)'],
-                                rock:     ['#9ca3af', 'rgba(156,163,175,.8)','rgba(156,163,175,.45)'],
+                                fire:     ['#ef4444', 'rgba(239,68,68,1)',    'rgba(239,68,68,.7)'],
+                                ice:      ['#3b82f6', 'rgba(59,130,246,1)',   'rgba(59,130,246,.7)'],
+                                grass:    ['#22c55e', 'rgba(34,197,94,1)',    'rgba(34,197,94,.7)'],
+                                rock:     ['#e2e8f0', 'rgba(226,232,240,1)', 'rgba(226,232,240,.7)'],
                             };
                             const aff = ap.elementAffinity as string | undefined;
-                            const [, borderCol, glowCol] = (aff && AFFINITY_GLOW[aff]) || ['#a78bfa', 'rgba(167,139,250,.8)', 'rgba(124,58,237,.45)'];
+                            const [, borderCol, glowCol] = (aff && AFFINITY_GLOW[aff]) || ['#a78bfa', 'rgba(167,139,250,1)', 'rgba(124,58,237,.7)'];
 
                             return (
                                 <>
                                     {/* Pulsing radial glow backdrop — only when canActivate */}
                                     {canActivate && (
-                                        <div
-                                            className="absolute rounded-full pointer-events-none z-[49]"
-                                            style={{
-                                                bottom: layout.ultButton.bottom - 18,
-                                                left:   layout.ultButton.left   - 18,
-                                                width:  layout.ultButton.size   + 36,
-                                                height: layout.ultButton.size   + 36,
-                                                background: `radial-gradient(circle, ${glowCol} 0%, transparent 68%)`,
-                                                animation: 'ult-glow-pulse 1.2s ease-in-out infinite',
-                                            }}
-                                        />
+                                        <>
+                                            {/* Wide radial bloom */}
+                                            <div
+                                                className="absolute rounded-full pointer-events-none z-[49]"
+                                                style={{
+                                                    bottom: layout.ultButton.bottom - 60,
+                                                    left:   layout.ultButton.left   - 60,
+                                                    width:  layout.ultButton.size   + 120,
+                                                    height: layout.ultButton.size   + 120,
+                                                    background: `radial-gradient(circle, ${glowCol} 0%, transparent 65%)`,
+                                                    animation: 'ult-glow-pulse 1.4s ease-in-out infinite',
+                                                }}
+                                            />
+                                            {/* Sonar ring */}
+                                            <div
+                                                className="absolute rounded-full pointer-events-none z-[49]"
+                                                style={{
+                                                    bottom: layout.ultButton.bottom,
+                                                    left:   layout.ultButton.left,
+                                                    width:  layout.ultButton.size,
+                                                    height: layout.ultButton.size,
+                                                    border: `3px solid ${borderCol}`,
+                                                    animation: 'ult-ring-expand 1.4s ease-out infinite',
+                                                }}
+                                            />
+                                        </>
                                     )}
 
                                     {/* Round liquid-fill ultimate button */}
@@ -1666,9 +1669,9 @@ const App: React.FC = () => {
                                             background: '#0a0520',
                                             border: `${canActivate ? 3 : 2}px solid ${isCharged ? borderCol : 'rgba(100,80,180,.4)'}`,
                                             boxShadow: canActivate
-                                                ? `0 0 0 4px ${borderCol}55, 0 0 48px ${glowCol}, 0 0 96px ${glowCol}`
+                                                ? `0 0 0 3px ${borderCol}, 0 0 18px ${borderCol}, 0 0 50px ${glowCol}, 0 0 110px ${glowCol}`
                                                 : isCharged
-                                                    ? `0 0 24px ${glowCol}, 0 0 48px ${glowCol}`
+                                                    ? `0 0 16px ${glowCol}, 0 0 40px ${glowCol}`
                                                     : '0 2px 12px rgba(0,0,0,.6)',
                                             animation: canActivate ? 'affinity-pulse 1.2s ease-in-out infinite' : 'none',
                                             transition: 'box-shadow .4s, border-color .4s',
