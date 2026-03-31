@@ -102,6 +102,21 @@ export const endTurn = (currentState: GameState): GameState => {
     }
     nextState.turnStartTime = currentTime;
 
+    const currentPlayerId = nextState.currentPlayerId;
+    const currentPlayer = nextState.players[currentPlayerId];
+
+    // HP-based win condition — always checked first, overrides any extra turns
+    const opponentId = currentPlayerId === 'Player1' ? 'Player2' : 'Player1';
+    const opponent = nextState.players[opponentId];
+    if (opponent.hp <= 0) {
+        nextState.winner = currentPlayerId;
+        nextState.phase = 'END';
+        nextState.ultimateExtraRolls = 0;
+        nextState.matchEndTime = Date.now();
+        nextState.logs = addLog(nextState, `Game Over! ${currentPlayer.name} wins by knockout!`);
+        return nextState;
+    }
+
     // Ultimate Extra Rolls check: Consume 1 count to loop back to SELECT_DICE
     const hasUltimateExtra = nextState.ultimateExtraRolls > 0;
 
@@ -113,33 +128,19 @@ export const endTurn = (currentState: GameState): GameState => {
             phase: 'SELECT_DICE',
             dice: [],
             diceCount: 2,
-            hasRolledDoubles: false, 
-            extraTurnActive: true,   
+            hasRolledDoubles: false,
+            extraTurnActive: true,
             selectedTokenId: null,
             animation: undefined,
         };
     }
 
-    const currentPlayerId = nextState.currentPlayerId;
-    const currentPlayer = nextState.players[currentPlayerId];
-    
     currentPlayer.tokens.forEach(t => {
         if (t.frozenRounds > 0) {
             if (t.justFrozen) t.justFrozen = false;
             else t.frozenRounds -= 1;
         }
     });
-
-        // HP-based win condition check
-    const opponentId = currentPlayerId === 'Player1' ? 'Player2' : 'Player1';
-    const opponent = nextState.players[opponentId];
-    if (opponent.hp <= 0) {
-        nextState.winner = currentPlayerId;
-        nextState.phase = 'END';
-        nextState.matchEndTime = Date.now();
-        nextState.logs = addLog(nextState, `Game Over! ${currentPlayer.name} wins by knockout!`);
-        return nextState;
-    }
 
     if (currentPlayerId === 'Player2') {
         if (nextState.currentRound >= nextState.maxRounds) {

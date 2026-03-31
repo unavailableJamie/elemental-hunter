@@ -23,7 +23,7 @@ import { ULTIMATES, CHARACTERS } from './config/characters.ts';
 import { DEFAULT_LAYOUT, type LayoutConfig } from './layoutConfig.ts';
 import { LEVEL_CONFIGS } from './config/levels.ts';
 import { DOUBLE_ROLL_COOLDOWN_ROUNDS, MAX_CONSECUTIVE_ROLLS } from './config/balance.ts';
-import { EmptyTilePopup } from './components/EmptyTilePopup.tsx';
+import { EmptyTilePopup, NormalTilePreviewPopup } from './components/EmptyTilePopup.tsx';
 import { GoalRewardPopup } from './components/GoalRewardPopup.tsx';
 import { applyRoleResolution } from './utils/roleResolver.ts';
 import { TILE_POSITIONS } from './boardLayout.ts';
@@ -195,6 +195,21 @@ const App: React.FC = () => {
     const [newTurnFlash, setNewTurnFlash] = useState<string | null>(null);
     // No-moves banner (auto-end-turn after 2s)
     const [noMovesBannerVisible, setNoMovesBannerVisible] = useState(false);
+    // Normal-tile toolbox preview
+    const [normalTilePreviewVisible, setNormalTilePreviewVisible] = useState(false);
+    const normalTileHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Auto-close after 10s, or immediately on any pointer action
+    useEffect(() => {
+        if (!normalTilePreviewVisible) return;
+        const close = () => setNormalTilePreviewVisible(false);
+        const autoClose = setTimeout(close, 10_000);
+        window.addEventListener('pointerdown', close, { capture: true });
+        return () => {
+            clearTimeout(autoClose);
+            window.removeEventListener('pointerdown', close, { capture: true });
+        };
+    }, [normalTilePreviewVisible]);
     // MAG feedback near ult button
     const [magFeedbacks, setMagFeedbacks] = useState<Array<{ id: number; amount: number }>>([]);
     // ATK / MAG Phaser scene animation events
@@ -719,32 +734,54 @@ const App: React.FC = () => {
             handleTeleportDestinationSelect(tileId);
             return;
         }
-        if (gameState.phase !== 'MOVE') return;
-        // Find which current-player token can reach this tile
-        const player = gameState.players[gameState.currentPlayerId];
-        const diceTotal = gameState.dice.reduce((a, b) => a + b, 0);
-        const token = player.tokens.find(t => {
-            if (t.frozenRounds > 0) return false;
-            const path = findPath(t.tileId, diceTotal, player.id, gameState);
-            if (path.length <= 1) return false;
-            const destId = path[path.length - 1];
-            if (destId !== tileId) return false;
-            // Block if own horse occupies a non-safezone tile
-            const destTile = gameState.board.flat().find(td => td?.id === destId);
-            const blockedByFriendly = destTile?.type !== TileType.SafeZone &&
-                player.tokens.some(ot => ot.tileId === destId && ot.id !== t.id);
-            return !blockedByFriendly;
-        });
-        if (!token) return;
-        setGameState(prev => {
-            const p = prev.players[prev.currentPlayerId];
-            const tk = p.tokens.find(t => t.id === token.id)!;
-            const path = findPath(tk.tileId, prev.dice.reduce((a, b) => a + b, 0), p.id, prev);
-            return path.length <= 1
-                ? endTurn(prev)
-                : { ...prev, phase: 'ANIMATING', selectedTokenId: tk.id, animation: { tokenId: tk.id, path, step: 0 } };
-        });
+        if (gameState.phase === 'MOVE') {
+            // Find which current-player token can reach this tile
+            const player = gameState.players[gameState.currentPlayerId];
+            const diceTotal = gameState.dice.reduce((a, b) => a + b, 0);
+            const token = player.tokens.find(t => {
+                if (t.frozenRounds > 0) return false;
+                const path = findPath(t.tileId, diceTotal, player.id, gameState);
+                if (path.length <= 1) return false;
+                const destId = path[path.length - 1];
+                if (destId !== tileId) return false;
+                const destTile = gameState.board.flat().find(td => td?.id === destId);
+                const blockedByFriendly = destTile?.type !== TileType.SafeZone &&
+                    player.tokens.some(ot => ot.tileId === destId && ot.id !== t.id);
+                return !blockedByFriendly;
+            });
+            if (token) {
+                // Move takes priority over preview
+                setNormalTilePreviewVisible(false);
+                setGameState(prev => {
+                    const p = prev.players[prev.currentPlayerId];
+                    const tk = p.tokens.find(t => t.id === token.id)!;
+                    const path = findPath(tk.tileId, prev.dice.reduce((a, b) => a + b, 0), p.id, prev);
+                    return path.length <= 1
+                        ? endTurn(prev)
+                        : { ...prev, phase: 'ANIMATING', selectedTokenId: tk.id, animation: { tokenId: tk.id, path, step: 0 } };
+                });
+                return;
+            }
+        }
+        // Show toolbox preview when clicking a Normal tile that isn't a move destination
+        const tilePos = TILE_POSITIONS[tileId];
+        const td = tilePos ? gameState.board[tilePos.y]?.[tilePos.x] : null;
+        if (td?.type === TileType.Normal) {
+            setNormalTilePreviewVisible(true);
+        }
     }, [gameState, handleTeleportDestinationSelect]);
+
+    const handleNormalTileHover = useCallback((tileId: number | null) => {
+        if (normalTileHideTimerRef.current) clearTimeout(normalTileHideTimerRef.current);
+        if (tileId !== null) {
+            setNormalTilePreviewVisible(true);
+        } else {
+            // Short delay prevents flicker when cursor briefly exits between tiles
+            normalTileHideTimerRef.current = setTimeout(() => {
+                setNormalTilePreviewVisible(false);
+            }, 120);
+        }
+    }, []);
 
     const handlePhaserTokenClick = useCallback((tokenId: number) => {
         const token = Object.values(gameState.players)
@@ -783,22 +820,36 @@ const App: React.FC = () => {
         return [...new Set(dests)];
     }, [gameState.phase, gameState.dice, gameState]);
 
-    // Token IDs that can legally move (non-blocked) — used for idle-bounce animation
+    // Token IDs that should play idle bounce — used for idle-bounce animation
     const movableTokenIds = useMemo(() => {
-        if (gameState.phase !== 'MOVE') return [];
         const player = gameState.players[gameState.currentPlayerId];
-        const diceTotal = gameState.dice.reduce((a, b) => a + b, 0);
-        if (diceTotal === 0) return [];
-        return player.tokens
-            .filter(t => {
-                if (t.frozenRounds > 0) return false;
-                const path = findPath(t.tileId, diceTotal, player.id, gameState);
-                if (path.length <= 1) return false;
-                const destId = path[path.length - 1];
-                const destTile = gameState.board.flat().find(td => td?.id === destId);
-                return !(destTile?.type !== TileType.SafeZone && player.tokens.some(ot => ot.tileId === destId && ot.id !== t.id));
-            })
-            .map(t => t.id);
+
+        // SELECT_DICE: all non-frozen current player tokens bounce (dice not known yet)
+        if (gameState.phase === 'SELECT_DICE') {
+            return player.tokens
+                .filter(t => t.frozenRounds <= 0)
+                .map(t => t.id);
+        }
+
+        // MOVE: keep bouncing only on tokens that can legally move with the dice result;
+        //       tokens blocked by a same-team piece stop bouncing
+        if (gameState.phase === 'MOVE') {
+            const diceTotal = gameState.dice.reduce((a, b) => a + b, 0);
+            if (diceTotal === 0) return [];
+            return player.tokens
+                .filter(t => {
+                    if (t.frozenRounds > 0) return false;
+                    const path = findPath(t.tileId, diceTotal, player.id, gameState);
+                    if (path.length <= 1) return false;
+                    const destId = path[path.length - 1];
+                    const destTile = gameState.board.flat().find(td => td?.id === destId);
+                    return !(destTile?.type !== TileType.SafeZone && player.tokens.some(ot => ot.tileId === destId && ot.id !== t.id));
+                })
+                .map(t => t.id);
+        }
+
+        // ANIMATING or any other phase: no bounce (chosen horse is moving)
+        return [];
     }, [gameState.phase, gameState.dice, gameState]);
     // ── No-moves banner: auto-end turn after 2s ───────────────────────────
     useEffect(() => {
@@ -1442,6 +1493,7 @@ const App: React.FC = () => {
                                     goalReachedEvent={goalReachedEvent}
                                     goalElementChosenEvent={goalElementChosenEvent}
                                     onGoalAnimationDone={handleGoalAnimationDone}
+                                    onNormalTileHover={handleNormalTileHover}
                                 />
 
                                 <div className="absolute inset-0 pointer-events-none z-[60]">
@@ -1775,6 +1827,15 @@ const App: React.FC = () => {
                         onLevelSelect={handleLevelSelect}
                         onCancel={handleCancelLevelSelect}
                         showCancelButton={gameState.currentRound > 1}
+                    />
+                )}
+
+                {/* Normal-tile toolbox preview — hidden during EMPTY_TILE_INTERACTION (real toolbox is open) */}
+                {gameState.phase !== 'EMPTY_TILE_INTERACTION' && !gameState.winner && (
+                    <NormalTilePreviewPopup
+                        gameState={gameState}
+                        layout={layout}
+                        visible={normalTilePreviewVisible}
                     />
                 )}
 

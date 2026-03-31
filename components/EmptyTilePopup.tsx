@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { ArrowLeftRight, RefreshCw, Zap } from 'lucide-react';
 import { TileType, GameState } from '../types.ts';
 import { ElementIcon } from './PlayerInfo.tsx';
@@ -66,22 +66,34 @@ interface QueueItemProps {
     index: number;
     isSelected: boolean;
     isBlinking: boolean;
+    isStamping: boolean;
+    isDimmed: boolean;
+    stampColor?: string;
     onClick: (i: number) => void;
 }
 
-const QueueItem: React.FC<QueueItemProps> = ({ type, index, isSelected, isBlinking, onClick }) => (
+const QueueItem: React.FC<QueueItemProps> = ({ type, index, isSelected, isBlinking, isStamping, isDimmed, stampColor = '#FCD34D', onClick }) => (
     <motion.div
         className="relative rounded-xl bg-white flex items-center justify-center shadow-lg cursor-pointer select-none"
         style={{ width: QUEUE_SLOT_W, height: QUEUE_SLOT_W, flexShrink: 0 }}
-        whileTap={{ scale: 0.88 }}
-        animate={isSelected ? { scale: 1.12 } : { scale: 1 }}
-        transition={{ type: 'spring', damping: 18, stiffness: 300 }}
+        whileTap={isStamping ? undefined : { scale: 0.88 }}
+        animate={
+            isStamping ? { scale: [1, 1.5, 0.88, 1.12, 1], opacity: 1 } :
+            isDimmed    ? { scale: 0.85, opacity: 0.22 } :
+            isSelected  ? { scale: 1.12, opacity: 1 } :
+                          { scale: 1,    opacity: 1 }
+        }
+        transition={
+            isStamping
+                ? { duration: 0.42, times: [0, 0.28, 0.58, 0.8, 1], ease: 'easeOut' }
+                : { type: 'spring', damping: 18, stiffness: 300 }
+        }
         onClick={() => onClick(index)}
     >
         <ElementIcon type={type} sizeOverride="w-9 h-9" />
 
         {/* Selected cursor — thick gold ring + glow */}
-        {isSelected && (
+        {isSelected && !isStamping && (
             <motion.div
                 className="absolute inset-0 rounded-xl pointer-events-none"
                 style={{ border: '4px solid #FCD34D' }}
@@ -93,6 +105,16 @@ const QueueItem: React.FC<QueueItemProps> = ({ type, index, isSelected, isBlinki
                     ],
                 }}
                 transition={{ duration: 0.75, repeat: Infinity }}
+            />
+        )}
+        {/* Stamp ring — flashes in during stamp */}
+        {isStamping && (
+            <motion.div
+                className="absolute inset-0 rounded-xl pointer-events-none"
+                style={{ border: `4px solid ${stampColor}` }}
+                initial={{ scale: 1.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.22 }}
             />
         )}
         {/* Blinking adjacent cursor — thick cyan ring */}
@@ -191,8 +213,8 @@ const ChargeCursor: React.FC<ChargeCursorProps> = ({ onComplete }) => {
                         setPhase('done');
                         tid = setTimeout(() => {
                             setPhase('stamped');
-                            // Hold stamp visible for 600ms so player can see it
-                            tid = setTimeout(() => onCompleteRef.current(targetRef.current), 600);
+                            // Let stamp animation play (380ms) then hand off to parent
+                            tid = setTimeout(() => onCompleteRef.current(targetRef.current), 420);
                         }, 900);
                     }
                 };
@@ -260,59 +282,94 @@ const InteractiveQueue: React.FC<InteractiveQueueProps> = ({
     queue, maxQueueSize, tool, onResolve, posX, posY,
 }) => {
     const [tempQueue, setTempQueue] = useState<TileType[]>([...queue]);
+    // Stable per-element IDs — drive framer-motion layout animation on swap
+    const [itemIds, setItemIds] = useState<string[]>(() =>
+        queue.map((_, i) => `qi-${i}-${Math.random().toString(36).slice(2, 7)}`)
+    );
     const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
     const [chargeComplete, setChargeComplete] = useState(false);
     const [visible, setVisible] = useState(true);
 
-    const resolveWithSlideOut = useCallback((newQ: TileType[]) => {
-        setTempQueue(newQ);
-        setVisible(false);
-        setTimeout(() => onResolve(newQ), 380);
+    // Animation phases: idle → animating (swap fly) → stamping → holding → (slide out)
+    const [animPhase, setAnimPhase] = useState<'idle' | 'animating' | 'stamping' | 'holding'>('idle');
+    const [stampIdxs, setStampIdxs] = useState<number[]>([]);  // slots that play stamp
+    const [dimIdxs,   setDimIdxs]   = useState<number[]>([]);  // slots that fade (change tool)
+
+    const toolColor = tool === 'SWAP' ? '#818CF8' : tool === 'CHANGE' ? '#34D399' : '#FCD34D';
+
+    // Hold 500ms then slide out
+    const holdThenSlide = useCallback((newQ: TileType[]) => {
+        setAnimPhase('holding');
+        setTimeout(() => {
+            setVisible(false);
+            setTimeout(() => onResolve(newQ), 380);
+        }, 500);
     }, [onResolve]);
 
     // ── SWAP ──────────────────────────────────────────────────────────────────
     const handleSwapClick = useCallback((idx: number) => {
+        if (animPhase !== 'idle') return;
         if (selectedIdx === null) {
             setSelectedIdx(idx);
         } else if (selectedIdx === idx) {
             setSelectedIdx(null);
         } else {
             if (Math.abs(idx - selectedIdx) === 1) {
-                const newQ = [...tempQueue];
-                [newQ[selectedIdx], newQ[idx]] = [newQ[idx], newQ[selectedIdx]];
+                const a = Math.min(selectedIdx, idx);
+                const b = Math.max(selectedIdx, idx);
+                const newQ   = [...tempQueue];
+                const newIds = [...itemIds];
+                [newQ[a],   newQ[b]]   = [newQ[b],   newQ[a]];
+                [newIds[a], newIds[b]] = [newIds[b], newIds[a]];
                 setSelectedIdx(null);
+                setAnimPhase('animating');
                 setTempQueue(newQ);
-                setTimeout(() => resolveWithSlideOut(newQ), 420);
+                setItemIds(newIds);
+                // Wait for layout crossing animation (~420ms), then stamp both
+                setTimeout(() => {
+                    setStampIdxs([a, b]);
+                    setAnimPhase('stamping');
+                    setTimeout(() => holdThenSlide(newQ), 460);
+                }, 420);
             } else {
                 setSelectedIdx(idx);
             }
         }
-    }, [selectedIdx, tempQueue, resolveWithSlideOut]);
+    }, [animPhase, selectedIdx, tempQueue, itemIds, holdThenSlide]);
 
     // ── CHANGE ────────────────────────────────────────────────────────────────
     const handleChangeClick = useCallback((idx: number) => {
+        if (animPhase !== 'idle') return;
         setSelectedIdx(prev => prev === idx ? null : idx);
-    }, []);
+    }, [animPhase]);
 
     const handleChangeSelect = useCallback((newType: TileType) => {
-        if (selectedIdx === null) return;
+        if (selectedIdx === null || animPhase !== 'idle') return;
         const newQ = [...tempQueue];
         newQ[selectedIdx] = newType;
+        const targetIdx = selectedIdx;
         setSelectedIdx(null);
         setTempQueue(newQ);
-        setTimeout(() => resolveWithSlideOut(newQ), 420);
-    }, [selectedIdx, tempQueue, resolveWithSlideOut]);
+        // Dim every slot except the changed one; stamp the changed slot
+        setDimIdxs(newQ.map((_, i) => i).filter(i => i !== targetIdx));
+        setStampIdxs([targetIdx]);
+        setAnimPhase('stamping');
+        setTimeout(() => holdThenSlide(newQ), 460);
+    }, [animPhase, selectedIdx, tempQueue, holdThenSlide]);
 
     // ── CHARGE ────────────────────────────────────────────────────────────────
     const handleChargeComplete = useCallback((result: TileType) => {
-        const newQ = [...tempQueue, result];
+        const newQ   = [...tempQueue, result];
         if (newQ.length > maxQueueSize) newQ.shift();
+        const newIds = [...itemIds];
+        if (newIds.length >= maxQueueSize) newIds.shift();
+        newIds.push(`qi-charge-${Date.now()}`);
+        setItemIds(newIds);
+        setTempQueue(newQ);
         setChargeComplete(true);
-        // Extra time so stamp animation is visible before slide-out
-        setTimeout(() => resolveWithSlideOut(newQ), 900);
-    }, [tempQueue, maxQueueSize, resolveWithSlideOut]);
-
-    const toolColor = tool === 'SWAP' ? '#818CF8' : tool === 'CHANGE' ? '#34D399' : '#FCD34D';
+        // Brief pause so ChargeCursor stamp is still fresh, then hold + slide
+        setTimeout(() => holdThenSlide(newQ), 180);
+    }, [tempQueue, itemIds, maxQueueSize, holdThenSlide]);
 
     return (
         <motion.div
@@ -340,69 +397,81 @@ const InteractiveQueue: React.FC<InteractiveQueueProps> = ({
                 <div className="flex items-center justify-between mb-3">
                     <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: toolColor }}>
                         {tool === 'SWAP' ? '⇄ Swap' : tool === 'CHANGE' ? '↺ Change' : '⚡ Charge'}
-                        {tool === 'SWAP' && selectedIdx !== null && ' — select adjacent'}
-                        {tool === 'CHANGE' && selectedIdx !== null && ' — choose new element'}
+                        {tool === 'SWAP' && selectedIdx !== null && animPhase === 'idle' && ' — select adjacent'}
+                        {tool === 'CHANGE' && selectedIdx !== null && animPhase === 'idle' && ' — choose new element'}
                     </p>
                     <span className="text-[9px] font-black uppercase text-zinc-500">
                         {tempQueue.length}/{maxQueueSize}
                     </span>
                 </div>
 
-                {/* Queue row — fixed width, HUD-like white background strip */}
-                <div
-                    className="rounded-xl flex items-center overflow-hidden shadow-inner"
-                    style={{
-                        background: 'rgba(255,255,255,0.08)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        gap: QUEUE_GAP,
-                        padding: '8px',
-                        minHeight: QUEUE_SLOT_W + 16,
-                    }}
-                >
-                    {Array.from({ length: maxQueueSize }).map((_, i) => {
-                        const hasElement = i < tempQueue.length;
-                        if (!hasElement) {
-                            // Charge tool: show cursor at i === tempQueue.length
-                            if (tool === 'CHARGE' && !chargeComplete && i === tempQueue.length) {
-                                return (
-                                    <ChargeCursor
-                                        key={`charge-cursor-${i}`}
-                                        onComplete={handleChargeComplete}
-                                    />
-                                );
+                {/* Queue row */}
+                <LayoutGroup id="iq-row">
+                    <div
+                        className="rounded-xl flex items-center shadow-inner"
+                        style={{
+                            background: 'rgba(255,255,255,0.08)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            gap: QUEUE_GAP,
+                            padding: '8px',
+                            minHeight: QUEUE_SLOT_W + 16,
+                        }}
+                    >
+                        {Array.from({ length: maxQueueSize }).map((_, i) => {
+                            const hasElement = i < tempQueue.length;
+                            if (!hasElement) {
+                                if (tool === 'CHARGE' && !chargeComplete && i === tempQueue.length) {
+                                    return (
+                                        <ChargeCursor
+                                            key={`charge-cursor-${i}`}
+                                            onComplete={handleChargeComplete}
+                                        />
+                                    );
+                                }
+                                return <EmptySlot key={`empty-${i}`} index={i} />;
                             }
-                            return <EmptySlot key={`empty-${i}`} index={i} />;
-                        }
-                        const type = tempQueue[i];
-                        let isBlinking = false;
-                        if (tool === 'SWAP' && selectedIdx !== null) {
-                            isBlinking = i === selectedIdx - 1 || i === selectedIdx + 1;
-                        }
-                        return (
-                            <div key={i} className="relative" style={{ flexShrink: 0 }}>
-                                {tool === 'CHANGE' && selectedIdx === i && (
-                                    <AnimatePresence>
-                                        <ChangePopup currentType={type} onSelect={handleChangeSelect} />
-                                    </AnimatePresence>
-                                )}
-                                <QueueItem
-                                    type={type}
-                                    index={i}
-                                    isSelected={selectedIdx === i}
-                                    isBlinking={isBlinking}
-                                    onClick={
-                                        tool === 'SWAP'   ? handleSwapClick :
-                                        tool === 'CHANGE' ? handleChangeClick :
-                                        () => {}
-                                    }
-                                />
-                            </div>
-                        );
-                    })}
-                </div>
+                            const type = tempQueue[i];
+                            let isBlinking = false;
+                            if (tool === 'SWAP' && selectedIdx !== null && animPhase === 'idle') {
+                                isBlinking = i === selectedIdx - 1 || i === selectedIdx + 1;
+                            }
+                            const isStamping = stampIdxs.includes(i);
+                            const isDimmed   = dimIdxs.includes(i);
+                            return (
+                                <motion.div
+                                    key={itemIds[i] ?? i}
+                                    layout
+                                    className="relative"
+                                    style={{ flexShrink: 0 }}
+                                    transition={{ type: 'spring', damping: 26, stiffness: 380 }}
+                                >
+                                    {tool === 'CHANGE' && selectedIdx === i && animPhase === 'idle' && (
+                                        <AnimatePresence>
+                                            <ChangePopup currentType={type} onSelect={handleChangeSelect} />
+                                        </AnimatePresence>
+                                    )}
+                                    <QueueItem
+                                        type={type}
+                                        index={i}
+                                        isSelected={selectedIdx === i && animPhase === 'idle'}
+                                        isBlinking={isBlinking}
+                                        isStamping={isStamping}
+                                        isDimmed={isDimmed}
+                                        stampColor={toolColor}
+                                        onClick={animPhase === 'idle' ? (
+                                            tool === 'SWAP'   ? handleSwapClick :
+                                            tool === 'CHANGE' ? handleChangeClick :
+                                            () => {}
+                                        ) : () => {}}
+                                    />
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+                </LayoutGroup>
 
                 {/* Hint */}
-                {tool === 'SWAP' && tempQueue.length < 2 && (
+                {tool === 'SWAP' && tempQueue.length < 2 && animPhase === 'idle' && (
                     <p className="text-[10px] text-zinc-500 text-center mt-2 italic">Need at least 2 elements to swap</p>
                 )}
             </div>
@@ -670,5 +739,90 @@ const ToolButton: React.FC<ToolButtonProps> = ({ label, icon, color, unlocked, o
                 )}
             </motion.button>
         </div>
+    );
+};
+
+// ─── Normal-tile toolbox preview popup ────────────────────────────────────────
+
+interface NormalTilePreviewPopupProps {
+    gameState: GameState;
+    layout: { toolPopup: { x: number; y: number } };
+    visible: boolean;
+}
+
+export const NormalTilePreviewPopup: React.FC<NormalTilePreviewPopupProps> = ({
+    gameState, layout, visible,
+}) => {
+    const player = gameState.players[gameState.currentPlayerId];
+    const visits = player.emptyTileVisits;
+    const levelConfig = LEVEL_CONFIGS[gameState.selectedLevel];
+    const maxArtifactSlots = levelConfig.artifactSlots;
+
+    const unlockedItems = {
+        SWAP:   visits >= ARTIFACT_SWAP_THRESHOLD   && maxArtifactSlots >= 1,
+        CHANGE: visits >= ARTIFACT_CHANGE_THRESHOLD && maxArtifactSlots >= 2,
+        CHARGE: visits >= ARTIFACT_CHARGE_THRESHOLD && maxArtifactSlots >= 3,
+    };
+
+    return (
+        <AnimatePresence>
+            {visible && (
+                <motion.div
+                    key="normal-tile-preview"
+                    className="fixed z-[240]"
+                    style={{
+                        bottom: layout.toolPopup.y,
+                        left: `calc(50% + ${layout.toolPopup.x}px)`,
+                        translateX: '-50%',
+                    }}
+                    initial={{ y: 50, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 50, opacity: 0 }}
+                    transition={{ type: 'spring', damping: 20, stiffness: 260 }}
+                >
+                    {/* PREVIEW badge */}
+                    <div className="flex justify-center mb-1.5">
+                        <span className="bg-amber-400 text-[9px] font-black uppercase tracking-widest text-black px-2.5 py-0.5 rounded-full shadow">
+                            Preview
+                        </span>
+                    </div>
+
+                    <div className="bg-zinc-900/97 border border-white/15 rounded-2xl shadow-2xl backdrop-blur-md">
+                        <div className="flex items-center gap-1 p-3">
+                            <div className="mr-2 text-[9px] font-black uppercase text-zinc-500 tracking-widest whitespace-nowrap">
+                                Visit #{visits}
+                            </div>
+                            {maxArtifactSlots >= 1 && (
+                                <ToolButton
+                                    label="Swap" icon={<ArrowLeftRight size={18} />} color="indigo"
+                                    unlocked={unlockedItems.SWAP}
+                                    onClick={() => {}}
+                                    effect="Swap two adjacent elements in your queue to reorder them."
+                                    unlockHint={!unlockedItems.SWAP ? `Unlocks at visit #${ARTIFACT_SWAP_THRESHOLD} (${Math.max(0, ARTIFACT_SWAP_THRESHOLD - visits)} more)` : undefined}
+                                />
+                            )}
+                            {maxArtifactSlots >= 2 && (
+                                <ToolButton
+                                    label="Change" icon={<RefreshCw size={18} />} color="emerald"
+                                    unlocked={unlockedItems.CHANGE}
+                                    onClick={() => {}}
+                                    effect="Replace any element in your queue with a different element type."
+                                    unlockHint={!unlockedItems.CHANGE ? `Unlocks at visit #${ARTIFACT_CHANGE_THRESHOLD} (${Math.max(0, ARTIFACT_CHANGE_THRESHOLD - visits)} more)` : undefined}
+                                />
+                            )}
+                            {maxArtifactSlots >= 3 && (
+                                <ToolButton
+                                    label="Charge" icon={<Zap size={18} />} color="amber"
+                                    unlocked={unlockedItems.CHARGE}
+                                    onClick={() => {}}
+                                    effect="Add a randomly drawn element to your queue."
+                                    unlockHint={!unlockedItems.CHARGE ? `Unlocks at visit #${ARTIFACT_CHARGE_THRESHOLD} (${Math.max(0, ARTIFACT_CHARGE_THRESHOLD - visits)} more)` : undefined}
+                                />
+                            )}
+                        </div>
+                    </div>
+                </motion.div>
+            )}
+        </AnimatePresence>
     );
 };

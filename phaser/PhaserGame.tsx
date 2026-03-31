@@ -31,6 +31,8 @@ interface Props {
   goalElementChosenEvent?: { playerId: string; element: string; tokenId: number; eid: number };
   /** Called by Phaser after the goal-reached glow sequence completes */
   onGoalAnimationDone?: () => void;
+  /** Fires tileId when pointer enters a Normal tile, null on leave */
+  onNormalTileHover?: (tileId: number | null) => void;
 }
 
 export const PhaserGame = ({
@@ -50,6 +52,7 @@ export const PhaserGame = ({
   goalReachedEvent,
   goalElementChosenEvent,
   onGoalAnimationDone,
+  onNormalTileHover,
 }: Props) => {
   const containerRef    = useRef<HTMLDivElement>(null);
   const gameRef         = useRef<Phaser.Game | null>(null);
@@ -98,6 +101,7 @@ export const PhaserGame = ({
       scene.onTileClick         = onTileClick;
       scene.onTokenClick        = onTokenClick;
       scene.onGoalAnimationDone = onGoalAnimationDone;
+      scene.onNormalTileHover   = onNormalTileHover;
       scene.events.emit('stateUpdate',     gameStateRef.current);
       scene.events.emit('highlightTiles',  highlightRef.current);
       scene.events.emit('movableTokenIds', movableRef.current);
@@ -119,9 +123,10 @@ export const PhaserGame = ({
   // ── Keep callbacks up to date ────────────────────────────────────────
   useEffect(() => {
     if (!sceneRef.current) return;
-    sceneRef.current.onTileClick  = onTileClick;
-    sceneRef.current.onTokenClick = onTokenClick;
-  }, [onTileClick, onTokenClick]);
+    sceneRef.current.onTileClick        = onTileClick;
+    sceneRef.current.onTokenClick       = onTokenClick;
+    sceneRef.current.onNormalTileHover  = onNormalTileHover;
+  }, [onTileClick, onTokenClick, onNormalTileHover]);
 
   // ── Push game state into Phaser scene (only after scene is ready) ─────
   useEffect(() => {

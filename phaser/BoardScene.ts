@@ -145,9 +145,11 @@ export class BoardScene extends Phaser.Scene {
   }>();
 
   // React callbacks (set by PhaserGame.tsx via scene.onTileClick = ...)
-  onTileClick?:        TileClickCb;
-  onTokenClick?:       TokenClickCb;
-  onGoalAnimationDone?: () => void;
+  onTileClick?:          TileClickCb;
+  onTokenClick?:         TokenClickCb;
+  onGoalAnimationDone?:  () => void;
+  /** Fires tileId when pointer enters a Normal tile, null when it leaves */
+  onNormalTileHover?:    (tileId: number | null) => void;
 
   constructor() { super({ key: 'BoardScene' }); }
 
@@ -1053,9 +1055,16 @@ export class BoardScene extends Phaser.Scene {
     const td  = this.gameState.board[pos.y]?.[pos.x];
     if (!td) return;
 
-    const base   = TILE_HEX[td.type] ?? 0xF3F4F6;
+    const base = DARK_TILE_IDS.has(tileId) ? DARK_TILE_COLOR
+               : P1_TILE_IDS.has(tileId)   ? P1_TILE_COLOR
+               : P2_TILE_IDS.has(tileId)   ? P2_TILE_COLOR
+               : (TILE_HEX[td.type] ?? 0xF3F4F6);
     const glow = over ? 0xFFFFFF : undefined;
     this.drawTile(g, pos.x, pos.y, base, glow);
+
+    if (td.type === TileType.Normal) {
+      this.onNormalTileHover?.(over ? tileId : null);
+    }
   }
 
   // ── Element-added swirling light → HUD fly ────────────────────────────────

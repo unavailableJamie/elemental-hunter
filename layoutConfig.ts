@@ -25,5 +25,5 @@ export const DEFAULT_LAYOUT: LayoutConfig = {
     ultButton:  { bottom: 70, left: 180, size: 130 },
     rollButton: { bottom: 70, right: 200, size: 130 },
     toolPopup:       { x: 0, y: 80 },   // centered, 80px from bottom
-    interactiveQueue:{ x: 0, y: 180 },  // centered, 180px from bottom
+    interactiveQueue:{ x: 0, y: 20 },   // centered, 20px from bottom
 };
